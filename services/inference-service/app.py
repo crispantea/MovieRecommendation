@@ -31,7 +31,7 @@ app = Flask(__name__)
 MODEL_SERVER_URL = os.environ.get("MODEL_SERVER_URL", "http://localhost:11434")
 MODEL_NAME = os.environ.get("MODEL_NAME", "llama3.1:8b")
 MAX_LLM_RETRIES = int(os.environ.get("MAX_LLM_RETRIES", 2))
-REQUEST_TIMEOUT = int(os.environ.get("REQUEST_TIMEOUT", 60))
+REQUEST_TIMEOUT = int(os.environ.get("REQUEST_TIMEOUT", 600))
 
 
 # ================================================================================================ #
@@ -175,7 +175,7 @@ def generate():
     message = body.get("message")
 
     if not profile:
-        return jsonify({"error": "user_id and profile are required"}), 400
+        return jsonify({"error": "profile is required"}), 400
 
     try:
         result = generate_recommendations(profile, candidates, message)

@@ -1,4 +1,7 @@
 services:
+  # ============================================================================================== #
+  # ========== Auth Service (Keycloak) =========================================================== #
+  # ============================================================================================== #
   auth:
     image: quay.io/keycloak/keycloak:26.7.3
     environment:
@@ -15,6 +18,7 @@ services:
       backend-auth:
         condition: service_healthy
   backend-auth:
+    # ref: https://hub.docker.com/_/postgres
     image: postgres:18.6
     restart: always
     shm_size: 128mb
@@ -30,6 +34,42 @@ services:
     ports:
       - "54321:5432"
 
+
+  # ============================================================================================== #
+  # ========== Inference Service ================================================================= #
+  # ============================================================================================== #
+  ollama:
+    # ref: https://hub.docker.com/r/ollama/ollama
+    image: ollama/ollama:0.34.1
+    volumes:
+      # - ollama_data:/root/.ollama
+      - ./inference-service/ollama-init.sh:/ollama-init.sh
+    entrypoint: ["/bin/sh", "/ollama-init.sh"]
+    ports:
+      - "11434:11434"
+
+  inference-service:
+    image: agi-inference-service
+    build:
+      context: ./inference-service
+    ports:
+      - "8000:8000"
+
+
+  # ============================================================================================== #
+  # ========== Profiles Catalog Service ========================================================== #
+  # ============================================================================================== #
+  backend:
+    image: agi-backend
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: postgresql://agi-backend:changeme@backend-database:5432/agi-backend
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend-database:
+        condition: service_healthy
 
   backend-database:
     # ref: https://hub.docker.com/_/postgres
@@ -50,18 +90,11 @@ services:
     # NOTE: This maps host port 54320 to container port 5432
     ports:
       - "54320:5432"
-  backend:
-    image: agi-backend
-    build:
-      context: ./backend
-    environment:
-      DATABASE_URL: postgresql://agi-backend:changeme@backend-database:5432/agi-backend
-    ports:
-      - "3000:3000"
-    depends_on:
-      backend-database:
-        condition: service_healthy
 
+
+  # ============================================================================================== #
+  # ========== Frontend Service ================================================================== #
+  # ============================================================================================== #
   frontend:
     image: agi-frontend
     build:
