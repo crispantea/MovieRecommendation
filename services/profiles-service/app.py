@@ -3,12 +3,57 @@ import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
+from jsonschema import validate, ValidationError
 
 app = Flask(__name__)
 CORS(app)  # allows requests from your Vite dev server (localhost:5173)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 db = SQLAlchemy(app)
+
+
+# ================================================================================================ #
+# ========== Schemas ============================================================================= #
+# ================================================================================================ #
+ALLOWED_GENRES = [
+    "sci-fi", "thriller", "mystery", "drama", "comedy", "action",
+    "horror", "romance", "musical", "documentary", "animation",
+    "fantasy", "crime", "adventure", "war", "biography",
+]
+
+PROFILE_UPDATE_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "favorite_genres": {
+            "type": "array",
+            "items": {"type": "string", "enum": ALLOWED_GENRES},
+        },
+        "favorite_actors": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1},
+        },
+        "disliked_genres": {
+            "type": "array",
+            "items": {"type": "string", "enum": ALLOWED_GENRES},
+        },
+        "mood": {"type": "string", "maxLength": 280},
+        "watch_history": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["title"],
+                "additionalProperties": False,
+                "properties": {
+                    "title": {"type": "string", "minLength": 1},
+                    "rating": {"type": "number", "minimum": 0, "maximum": 5},
+                },
+            },
+        },
+        "min_year": {"type": "integer", "minimum": 1900, "maximum": 2100},
+        "visibility": {"type": "string", "enum": ["public", "private"]},
+    },
+}
 
 
 # ================================================================================================ #
@@ -106,6 +151,35 @@ def get_my_profile():
         return jsonify({"error": "profile doesn't exist"}), 409
 
     return jsonify(profile.to_dict()), 201
+
+@app.route("/profiles/me", methods=["PATCH"])
+def update_my_profile():
+    user_id = request.args.get("user_id")
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+
+    profile = Profile.query.get(user_id)
+    if not profile:
+        return jsonify({"error": "profile not found"}), 404
+
+    body = request.get_json(silent=True) or {}
+
+    if not body:
+        return jsonify({"error": "request body is empty"}), 400
+
+    try:
+        validate(instance=body, schema=PROFILE_UPDATE_SCHEMA)
+    except ValidationError as exc:
+        return jsonify({"error": f"invalid profile update: {exc.message}"}), 400
+
+    # Only overwrite fields explicitly present in the request (partial update)
+    for field in PROFILE_UPDATE_SCHEMA["properties"]:
+        if field in body:
+            setattr(profile, field, body[field])
+
+    db.session.commit()
+
+    return jsonify(profile.to_dict()), 200
 
 @app.route("/profiles", methods=["POST"])
 def create_profile():
