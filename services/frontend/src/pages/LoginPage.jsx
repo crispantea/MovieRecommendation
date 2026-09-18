@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import LoginForm from '../components/LoginForm.jsx'
 
 export default function LoginPage() {
@@ -5,6 +6,8 @@ export default function LoginPage() {
     <div style={{ maxWidth: 320, margin: '80px auto', fontFamily: 'sans-serif' }}>
       <h2>Login</h2>
       <LoginForm />
+
+      <p>No account? <Link to="/register">Register here</Link></p>
     </div>
   )
 }

@@ -3,6 +3,7 @@ import LoginPage from './pages/LoginPage.jsx'
 import MainPage from './pages/MainPage.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import PublicRoute from './components/PublicRoute.jsx'
+import RegisterPage from './pages/RegisterPage.jsx'
 
 export default function App() {
   return (
@@ -13,6 +14,14 @@ export default function App() {
           element={
             <PublicRoute>
               <LoginPage />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <PublicRoute>
+              <RegisterPage />
             </PublicRoute>
           }
         />
