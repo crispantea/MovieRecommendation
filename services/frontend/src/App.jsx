@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import LoginPage from './pages/LoginPage.jsx'
-import MainPage from './pages/MainPage.jsx'
+import ProfilePage from './pages/ProfilePage.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import PublicRoute from './components/PublicRoute.jsx'
 import RegisterPage from './pages/RegisterPage.jsx'
@@ -29,7 +29,7 @@ export default function App() {
           path="/"
           element={
             <ProtectedRoute>
-              <MainPage />
+              <ProfilePage />
             </ProtectedRoute>
           }
         />

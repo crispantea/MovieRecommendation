@@ -48,6 +48,7 @@ services:
       context: ./inference-service
     container_name: inference-service
     environment:
+      PROFILES_SERVICE_URL: http://profiles-service:3000
       MODEL_SERVER_URL: http://inference-service-ollama:11434
     ports:
       - "8000:8000"

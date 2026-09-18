@@ -16,7 +16,7 @@ export default function ProfileForm() {
   if (loading) return <p>Loading profile...</p>
 
   return (
-    <form onSubmit={saveProfile}>
+    <form onSubmit={saveProfile} style={{ marginBottom: 50 }}>
       <h3>Favorite genres</h3>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
         {ALLOWED_GENRES.map((genre) => (

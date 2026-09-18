@@ -1,9 +1,7 @@
-const API_URL = import.meta.env.VITE_API_URL
-
 export async function getMyProfile() {
   const user_id = localStorage.getItem('user_id')
 
-  const res = await fetch(`${API_URL}/profiles/me?user_id=${user_id}`)
+  const res = await fetch(`/api/profiles/profiles/me?user_id=${user_id}`)
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
@@ -14,7 +12,7 @@ export async function getMyProfile() {
 }
 
 export async function updateMyProfile(user_id, updates) {
-  const res = await fetch(`${API_URL}/profiles/me?user_id=${user_id}`, {
+  const res = await fetch(`/api/profiles/profiles/me?user_id=${user_id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(updates),

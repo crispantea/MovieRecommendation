@@ -1,7 +1,5 @@
-const API_URL = import.meta.env.VITE_API_URL  // VITE_API_URL is an environment variable
-
 export async function loginRequest(email, password) {
-  const res = await fetch(`${API_URL}/login`, {
+  const res = await fetch(`/api/profiles/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
@@ -16,7 +14,7 @@ export async function loginRequest(email, password) {
 }
 
 export async function registerRequest(email, password) {
-  const res = await fetch(`${API_URL}/register`, {
+  const res = await fetch(`/api/profiles/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),

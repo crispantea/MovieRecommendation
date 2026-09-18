@@ -28,6 +28,10 @@ app = Flask(__name__)
 # ================================================================================================ #
 # ========== Configuration ======================================================================= #
 # ================================================================================================ #
+# Profiles service
+PROFILES_SERVICE_URL = os.environ.get("PROFILES_SERVICE_URL", "http://localhost:3000")
+
+# Ollama service
 MODEL_SERVER_URL = os.environ.get("MODEL_SERVER_URL", "http://localhost:11434")
 MODEL_NAME = os.environ.get("MODEL_NAME", "llama3.1:8b")
 MAX_LLM_RETRIES = int(os.environ.get("MAX_LLM_RETRIES", 2))
@@ -81,6 +85,8 @@ pool of candidate movies, select and rank the best matches.
 
 User profile:
 {json.dumps(profile, indent=2)}
+
+Note: Do NOT recommend movies that the user has already watched.
 
 Candidate movies (prefer these; only go outside this list if none fit well):
 {candidate_block}
@@ -167,15 +173,18 @@ def health():
 def generate():
     """
     Synchronous, user-facing endpoint.
-    Expects: { "profile": {...}, "message": "optional free text" }
+    Expects: { "user_id": {...}, "message": "optional free text" }
     """
     body = request.get_json(silent=True) or {}
-    profile = body.get("profile")
+    user_id = body.get("user_id")
     candidates = body.get("candidates")
     message = body.get("message")
 
-    if not profile:
-        return jsonify({"error": "profile is required"}), 400
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+
+    # Fetch profile from profiles-service
+    profile = requests.get(f"{PROFILES_SERVICE_URL}/profiles/me?{user_id}").json()
 
     try:
         result = generate_recommendations(profile, candidates, message)
