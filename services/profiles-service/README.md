@@ -1,6 +1,6 @@
-# Backend Application
+# Profiles Service Application
 
-A Flask API for AGI project.
+A Flask API for managing profiles in this project.
 
 ## Setup
 
