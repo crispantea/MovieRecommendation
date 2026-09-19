@@ -1,0 +1,33 @@
+{
+  "realm": "master",
+  "enabled": true,
+  "sslRequired": "external",
+  "clients": [
+    {
+      "clientId": "terraform",
+      "name": "Terraform",
+      "description": "Service account client used by Terraform to manage Keycloak",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${KEYCLOAK_TERRAFORM_SECRET}",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": true,
+      "attributes": {
+        "access.token.lifespan": "300"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-terraform",
+      "enabled": true,
+      "serviceAccountClientId": "terraform",
+      "realmRoles": ["create-realm"]
+    }
+  ]
+}

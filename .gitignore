@@ -1,0 +1,31 @@
+# ----------------------------------------------
+# TERRAFORM
+# ----------------------------------------------
+.terraform/
+
+# Local .terraform directories
+.terraform/
+
+# .tfstate files
+*.tfstate
+*.tfstate.*
+
+*.tfvars
+*.tfvars.json
+
+# Ignore transient lock info files created by terraform apply
+.terraform.tfstate.lock.info
+
+# ----------------------------------------------
+# AUTHORIZATION
+# ----------------------------------------------
+
+# Generated file with confidential secret
+services/authorization/import/realm-export.json
+
+
+# ----------------------------------------------
+# GENERAL
+# ----------------------------------------------
+
+.env.secrets
