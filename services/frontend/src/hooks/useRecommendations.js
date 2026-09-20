@@ -2,19 +2,17 @@ import { useState } from 'react'
 import { getRecommendations } from '../api/recommendations.js'
 
 export function useRecommendations() {
-  const userId = localStorage.getItem('user_id')
-
   const [recommendations, setRecommendations] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  async function fetchRecommendations() {
+  async function fetchRecommendations(candidates = [], message = null) {
     setError('')
     setLoading(true)
     setRecommendations([])
 
     try {
-      const data = await getRecommendations(userId)
+      const data = await getRecommendations(candidates, message)
       setRecommendations(data.recommendations)
     } catch (err) {
       setError(err.message)

@@ -1,15 +1,73 @@
 import os
-import requests
+import logging
+from functools import wraps
+
+import jwt
+from jwt import PyJWKClient
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from jsonschema import validate, ValidationError
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("profiles-service")
+
 app = Flask(__name__)
 CORS(app)  # allows requests from your Vite dev server (localhost:5173)
 
+PORT = int(os.environ.get('PORT'))
+
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+
+# Keycloak JWT verification configuration from environment
+JWKS_URL = os.environ.get('KEYCLOAK_JWKS_URL')
+KEYCLOAK_ISSUER = os.environ.get('KEYCLOAK_ISSUER')
+AUDIENCE = os.environ.get('AUDIENCE')
+
+if not JWKS_URL:
+    raise RuntimeError("CRITICAL: KEYCLOAK_JWKS_URL environment variable is required.")
+
+jwk_client = PyJWKClient(JWKS_URL)
+
+def require_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return jsonify({"error": "Missing or invalid Authorization header"}), 401
+
+        token = auth_header.split(" ")[1]
+
+        try:
+            signing_key = jwk_client.get_signing_key_from_jwt(token)
+            options = {"verify_aud": bool(AUDIENCE)}
+
+            kwargs_jwt = {
+                "jwt": token,
+                "key": signing_key.key,
+                "algorithms": ["RS256"],
+                "options": options,
+            }
+            if AUDIENCE:
+                kwargs_jwt["audience"] = AUDIENCE
+            if KEYCLOAK_ISSUER:
+                kwargs_jwt["issuer"] = KEYCLOAK_ISSUER
+
+            payload = jwt.decode(**kwargs_jwt)
+            request.user_id = payload.get("sub")
+
+            if not request.user_id:
+                return jsonify({"error": "Unauthorized: Token missing sub claim"}), 401
+
+        except Exception as e:
+            logger.warning("JWT Verification Failed: %s", e)
+            return jsonify({"error": "Unauthorized or invalid token"}), 401
+
+        return f(*args, **kwargs)
+
+    return decorated
 
 
 # ================================================================================================ #
@@ -59,15 +117,10 @@ PROFILE_UPDATE_SCHEMA = {
 # ================================================================================================ #
 # ========== Models ============================================================================== #
 # ================================================================================================ #
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password = db.Column(db.String(200), nullable=False)
-
 class Profile(db.Model):
     __tablename__ = "profiles"
 
-    user_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String(128), primary_key=True)
     favorite_genres = db.Column(db.JSON, default=list)
     favorite_actors = db.Column(db.JSON, default=list)
     disliked_genres = db.Column(db.JSON, default=list)
@@ -96,71 +149,36 @@ class Profile(db.Model):
 def health():
     return jsonify({"status": "ok"}), 200
 
-# TODO: Replace by auth service
-@app.route('/login', methods=['POST'])
-def login():
-    data = request.get_json() or {}
-    email = data.get('email')
-    password = data.get('password')
-
-    user = User.query.filter_by(email=email).first()
-
-    if not user or user.password != password:
-        return jsonify({"message": "Invalid email or password"}), 401
-
-    return jsonify({"token": "fake-jwt-token", "user_id": user.id}), 200
-
-# TODO: Replace by auth service
-@app.route('/register', methods=['POST'])
-def register():
-    data = request.get_json() or {}
-    email = data.get('email')
-    password = data.get('password')
-
-    user = User.query.filter_by(email=email).first()
-
-    if user:
-        return jsonify({"message": "User already exists"}), 401
-
-    user = User(email=email, password=password)
-    db.session.add(user)
-    db.session.commit()
-
-    # Create profile
-    requests.post(
-        "http://localhost:3000/profiles",
-        json={
-            "user_id": user.id
-        }
-    )
-
-    return jsonify({"token": "fake-jwt-token", "user_id": user.id}), 200
-
 
 @app.route("/profiles/me", methods=["GET"])
+@require_auth
 def get_my_profile():
     """
     Returns the logged in user profile.
+    Auto-creates profile if missing on first request.
     """
-    user_id = request.args.get("user_id")
-    if not user_id:
-        return jsonify({"error": "user_id is required"}), 400
+    user_id = request.user_id
 
-    profile = Profile.query.get(user_id)
+    profile = db.session.get(Profile, user_id)
     if not profile:
-        return jsonify({"error": "profile doesn't exist"}), 409
+        profile = Profile(user_id=user_id)
+        db.session.add(profile)
+        db.session.commit()
 
-    return jsonify(profile.to_dict()), 201
+    return jsonify(profile.to_dict()), 200
+
 
 @app.route("/profiles/me", methods=["PATCH"])
+@require_auth
 def update_my_profile():
-    user_id = request.args.get("user_id")
-    if not user_id:
-        return jsonify({"error": "user_id is required"}), 400
+    """
+    Updates fields on the logged-in user's profile.
+    """
+    user_id = request.user_id
 
-    profile = Profile.query.get(user_id)
+    profile = db.session.get(Profile, user_id)
     if not profile:
-        return jsonify({"error": "profile not found"}), 404
+        return jsonify({"error": "this user doesnt have a profile"})
 
     body = request.get_json(silent=True) or {}
 
@@ -172,7 +190,6 @@ def update_my_profile():
     except ValidationError as exc:
         return jsonify({"error": f"invalid profile update: {exc.message}"}), 400
 
-    # Only overwrite fields explicitly present in the request (partial update)
     for field in PROFILE_UPDATE_SCHEMA["properties"]:
         if field in body:
             setattr(profile, field, body[field])
@@ -181,27 +198,6 @@ def update_my_profile():
 
     return jsonify(profile.to_dict()), 200
 
-@app.route("/profiles", methods=["POST"])
-def create_profile():
-    """
-    Called by Auth Service right after a user successfully registers.
-    Creates an empty default profile for that user_id.
-    """
-    body = request.get_json(silent=True) or {}
-    user_id = body.get("user_id")
-
-    if not user_id:
-        return jsonify({"error": "user_id is required"}), 400
-
-    if Profile.query.get(user_id):
-        return jsonify({"error": "profile already exists"}), 409
-
-    profile = Profile(user_id=user_id)
-    db.session.add(profile)
-    db.session.commit()
-
-    return jsonify(profile.to_dict()), 201
-
 
 # ================================================================================================ #
 # ========== Main function ======================================================================= #
@@ -209,4 +205,4 @@ def create_profile():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(host='0.0.0.0', port=3000, debug=True)
+    app.run(host='0.0.0.0', port=PORT, debug=True)

@@ -1,27 +1,6 @@
-export async function getMyProfile() {
-  const user_id = localStorage.getItem('user_id')
+import { api } from './client'
 
-  const res = await fetch(`/api/profiles/profiles/me?user_id=${user_id}`)
+export const getMyProfile = () => api('/api/profiles/me')
 
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body.error || 'Failed to load profile')
-  }
-
-  return res.json()
-}
-
-export async function updateMyProfile(user_id, updates) {
-  const res = await fetch(`/api/profiles/profiles/me?user_id=${user_id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updates),
-  })
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body.error || 'Failed to update profile')
-  }
-
-  return res.json()
-}
+export const updateMyProfile = (updates) =>
+  api('/api/profiles/me', { method: 'PATCH', body: updates })

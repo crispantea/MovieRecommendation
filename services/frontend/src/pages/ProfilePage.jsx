@@ -4,8 +4,7 @@ import RecommendationsSection from '../components/RecommendationsSection.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 
 export default function ProfilePage() {
-  const { logout } = useAuth()
-  const email = localStorage.getItem('email')
+  const { user } = useAuth()
 
   return (
     <div style={{ maxWidth: 480, margin: '40px auto', fontFamily: 'sans-serif' }}>

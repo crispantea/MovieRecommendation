@@ -7,15 +7,40 @@ services:
     image: quay.io/keycloak/keycloak:26.7.3
     container_name: auth-service
     environment:
-      - KC_BOOTSTRAP_ADMIN_USERNAME=admin
-      - KC_BOOTSTRAP_ADMIN_PASSWORD=changeme
+      # Used to access the master realm
+      - KC_BOOTSTRAP_ADMIN_USERNAME=${KEYCLOAK_ADMIN_USER}
+      - KC_BOOTSTRAP_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+
       - KC_DB=postgres
-      - KC_DB_USERNAME=agi-auth-backend
-      - KC_DB_PASSWORD=changeme
-      - KC_DB_URL=jdbc:postgresql://auth-service-database:5432/agi-auth-backend
+      - KC_DB_USERNAME=${AUTH_DB_USER}
+      - KC_DB_PASSWORD=${AUTH_DB_PASSWORD}
+      - KC_DB_URL=jdbc:postgresql://auth-service-database:5432/${AUTH_DB_NAME}
     ports:
-      - "8080:8080"
-    command: start-dev
+      - "${KEYCLOAK_HOST_PORT}:8080"
+    command:
+      - start-dev
+      - --import-realm
+      - --health-enabled=true
+    volumes:
+      # Volume with the initial permissions for the terraform client
+      - ./authorization/import/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    healthcheck:
+      # Opens a socket using fd 3, issues a GET request to the health endpoint
+      # and redirects the output back to fd 3. Grep returns success if response
+      # contains "200 OK", otherwise returns failed and retries.
+      # NOTE: This is required because keycloak container doesnt have curl or wget
+      # and therefore we need to use something simmilar to this. If something more
+      # clean is found, change this!
+      test:
+        - CMD-SHELL
+        - |
+          exec 3<>/dev/tcp/127.0.0.1/9000
+          echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3
+          grep -q '200 OK' <&3
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     depends_on:
       auth-service-database:
         condition: service_healthy
@@ -27,16 +52,16 @@ services:
     restart: always
     shm_size: 128mb
     environment:
-      POSTGRES_USER: agi-auth-backend
-      POSTGRES_PASSWORD: changeme
-      POSTGRES_DB: agi-auth-backend
+      POSTGRES_USER: ${AUTH_DB_USER}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD}
+      POSTGRES_DB: ${AUTH_DB_NAME}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
       interval: 2s
       timeout: 1s
       retries: 5
     ports:
-      - "54321:5432"
+      - "${AUTH_DB_HOST_PORT}:5432"
 
 
   # ============================================================================================== #
@@ -48,10 +73,14 @@ services:
       context: ./inference-service
     container_name: inference-service
     environment:
-      PROFILES_SERVICE_URL: http://profiles-service:3000
+      PORT: ${INFERENCE_PORT}
+      PROFILES_SERVICE_URL: http://profiles-service:${PROFILES_PORT}
       MODEL_SERVER_URL: http://inference-service-ollama:11434
+      KEYCLOAK_ISSUER: http://localhost:${KEYCLOAK_HOST_PORT}/realms/${KEYCLOAK_APP_REALM}
+      KEYCLOAK_JWKS_URL: http://auth-service:8080/realms/${KEYCLOAK_APP_REALM}/protocol/openid-connect/certs
+      AUDIENCE: ${INFERENCE_AUDIENCE}
     ports:
-      - "8000:8000"
+      - "${INFERENCE_HOST_PORT}:${INFERENCE_PORT}"
 
   inference-service-ollama:
     # ref: https://hub.docker.com/r/ollama/ollama
@@ -62,7 +91,7 @@ services:
       - ./inference-service/ollama-init.sh:/ollama-init.sh
     entrypoint: ["/bin/sh", "/ollama-init.sh"]
     ports:
-      - "11434:11434"
+      - "${OLLAMA_HOST_PORT}:11434"
 
 
   # ============================================================================================== #
@@ -74,9 +103,13 @@ services:
       context: ./profiles-service
     container_name: profiles-service
     environment:
-      DATABASE_URL: postgresql://agi-backend:changeme@profiles-service-database:5432/agi-backend
+      PORT: ${PROFILES_PORT}
+      DATABASE_URL: postgresql://${PROFILES_DB_USER}:${PROFILES_DB_PASSWORD}@profiles-service-database:5432/${PROFILES_DB_NAME}
+      KEYCLOAK_ISSUER: http://localhost:${KEYCLOAK_HOST_PORT}/realms/${KEYCLOAK_APP_REALM}
+      KEYCLOAK_JWKS_URL: http://auth-service:8080/realms/${KEYCLOAK_APP_REALM}/protocol/openid-connect/certs
+      AUDIENCE: ${PROFILES_AUDIENCE}
     ports:
-      - "3000:3000"
+      - "${PROFILES_HOST_PORT}:${PROFILES_PORT}"
     depends_on:
       profiles-service-database:
         condition: service_healthy
@@ -89,18 +122,18 @@ services:
     # set shared memory limit when using docker compose
     shm_size: 128mb
     environment:
-      POSTGRES_USER: agi-backend
-      POSTGRES_PASSWORD: changeme
-      POSTGRES_DB: agi-backend
+      POSTGRES_USER: ${PROFILES_DB_USER}
+      POSTGRES_PASSWORD: ${PROFILES_DB_PASSWORD}
+      POSTGRES_DB: ${PROFILES_DB_NAME}
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
       interval: 2s
       timeout: 1s
       retries: 5
     # TODO: Remove (dev purposes only)
-    # NOTE: This maps host port 54320 to container port 5432
+    # NOTE: This maps a host port to container port 5432
     ports:
-      - "54320:5432"
+      - "${PROFILES_DB_HOST_PORT}:5432"
 
 
   # ============================================================================================== #
@@ -111,10 +144,15 @@ services:
     container_name: frontend
     build:
       context: ./frontend
-      args:
-        VITE_API_URL: http://localhost:3000
+    environment:
+      PORT: ${FRONTEND_PORT}
+      PROFILES_SERVICE_URL: http://profiles-service:${PROFILES_PORT}
+      INFERENCE_SERVICE_URL: http://inference-service:${INFERENCE_PORT}
+      VITE_KEYCLOAK_URL: http://localhost:${KEYCLOAK_HOST_PORT}
+      VITE_KEYCLOAK_APP_REALM: ${KEYCLOAK_APP_REALM}
+      VITE_KEYCLOAK_APP_CLIENT_ID: ${KEYCLOAK_APP_CLIENT_ID}
     ports:
-      - "5173:5173"
+      - "${FRONTEND_HOST_PORT}:${FRONTEND_PORT}"
     depends_on:
       - inference-service
       - profiles-service

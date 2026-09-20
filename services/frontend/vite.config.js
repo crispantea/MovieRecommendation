@@ -10,16 +10,16 @@ export default defineConfig(({ mode }) => {
     server: {
       proxy: {
         '/api/inference': {
-          target: env.VITE_INFERENCE_SERVICE_URL,
+          target: env.INFERENCE_SERVICE_URL,
           changeOrigin: true,
           rewrite: (path) =>
             path.replace(/^\/api\/inference/, ''),
         },
         '/api/profiles': {
-          target: env.VITE_PROFILES_SERVICE_URL,
+          target: env.PROFILES_SERVICE_URL,
           changeOrigin: true,
           rewrite: (path) =>
-            path.replace(/^\/api\/profiles/, ''),
+            path.replace(/^\/api\/profiles/, '/profiles'),
         },
       },
     },

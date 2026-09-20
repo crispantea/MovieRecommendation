@@ -14,8 +14,11 @@ import os
 import json
 import logging
 from datetime import datetime, timezone
+from functools import wraps
 
 import requests
+import jwt
+from jwt import PyJWKClient
 from flask import Flask, request, jsonify
 from jsonschema import validate, ValidationError
 
@@ -28,14 +31,61 @@ app = Flask(__name__)
 # ================================================================================================ #
 # ========== Configuration ======================================================================= #
 # ================================================================================================ #
+PORT = int(os.environ.get("PORT", 8000))
+
 # Profiles service
-PROFILES_SERVICE_URL = os.environ.get("PROFILES_SERVICE_URL", "http://localhost:3000")
+PROFILES_SERVICE_URL = os.environ.get("PROFILES_SERVICE_URL")
 
 # Ollama service
-MODEL_SERVER_URL = os.environ.get("MODEL_SERVER_URL", "http://localhost:11434")
+MODEL_SERVER_URL = os.environ.get("MODEL_SERVER_URL")
 MODEL_NAME = os.environ.get("MODEL_NAME", "llama3.1:8b")
 MAX_LLM_RETRIES = int(os.environ.get("MAX_LLM_RETRIES", 2))
 REQUEST_TIMEOUT = int(os.environ.get("REQUEST_TIMEOUT", 600))
+
+# Security / Keycloak Configuration
+KEYCLOAK_JWKS_URL = os.environ.get("KEYCLOAK_JWKS_URL")
+KEYCLOAK_ISSUER = os.environ.get("KEYCLOAK_ISSUER")
+AUDIENCE = os.environ.get("AUDIENCE")
+
+if not KEYCLOAK_JWKS_URL:
+    raise RuntimeError("CRITICAL: KEYCLOAK_JWKS_URL environment variable is required for authentication.")
+
+jwks_client = PyJWKClient(KEYCLOAK_JWKS_URL)
+
+def require_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return jsonify({"error": "Missing or invalid Authorization header"}), 401
+
+        token = auth_header.split(" ")[1]
+
+        try:
+            signing_key = jwks_client.get_signing_key_from_jwt(token)
+
+            decode_options = {"verify_aud": bool(AUDIENCE)}
+            
+            kwargs_jwt = {
+                "jwt": token,
+                "key": signing_key.key,
+                "algorithms": ["RS256"],
+                "options": decode_options,
+            }
+            if AUDIENCE:
+                kwargs_jwt["audience"] = AUDIENCE
+            if KEYCLOAK_ISSUER:
+                kwargs_jwt["issuer"] = KEYCLOAK_ISSUER
+
+            request.token_payload = jwt.decode(**kwargs_jwt)
+
+        except Exception as exc:
+            logger.warning("Token verification failed: %s", exc)
+            return jsonify({"error": "Unauthorized: Invalid or expired token"}), 401
+
+        return f(*args, **kwargs)
+
+    return decorated
 
 
 # ================================================================================================ #
@@ -170,21 +220,34 @@ def health():
     return jsonify({"status": "ok"}), 200
 
 @app.route("/recommendations/generate", methods=["POST"])
+@require_auth
 def generate():
     """
     Synchronous, user-facing endpoint.
-    Expects: { "user_id": {...}, "message": "optional free text" }
+    Expects: { "candidates": [...], "message": "optional free text" }
     """
     body = request.get_json(silent=True) or {}
-    user_id = body.get("user_id")
     candidates = body.get("candidates")
     message = body.get("message")
 
-    if not user_id:
-        return jsonify({"error": "user_id is required"}), 400
+    # Forward Authorization header to internal services
+    headers = {}
+    auth_header = request.headers.get("Authorization")
+    if auth_header:
+        headers["Authorization"] = auth_header
 
-    # Fetch profile from profiles-service
-    profile = requests.get(f"{PROFILES_SERVICE_URL}/profiles/me?{user_id}").json()
+    # Fetch profile from profiles-service using the Bearer token
+    try:
+        resp = requests.get(
+            f"{PROFILES_SERVICE_URL}/profiles/me",
+            headers=headers,
+            timeout=10,
+        )
+        resp.raise_for_status()
+        profile = resp.json()
+    except requests.RequestException as exc:
+        logger.error("Failed to fetch user profile: %s", exc)
+        return jsonify({"error": "failed to fetch user profile"}), 502
 
     try:
         result = generate_recommendations(profile, candidates, message)
@@ -220,7 +283,7 @@ def generate():
 #             results.append({"user_id": user_id, "error": "missing profile"})
 #             continue
 #         try:
-#             result = generate_recommendations(profile)
+#             result = generate_recommendations(profile, candidates=[])
 #             results.append({
 #                 "user_id": user_id,
 #                 "recommendations": result["recommendations"],
@@ -234,4 +297,4 @@ def generate():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000)
+    app.run(host="0.0.0.0", port=PORT)
