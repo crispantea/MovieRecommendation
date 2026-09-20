@@ -1,4 +1,7 @@
 import os
+import logging
+from functools import wraps
+
 import jwt
 from jwt import PyJWKClient
 from flask import Flask, request, jsonify
@@ -6,16 +9,65 @@ from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from jsonschema import validate, ValidationError
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("profiles-service")
+
 app = Flask(__name__)
 CORS(app)  # allows requests from your Vite dev server (localhost:5173)
 
+PORT = int(os.environ.get('PORT'))
+
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # Keycloak JWT verification configuration from environment
 JWKS_URL = os.environ.get('KEYCLOAK_JWKS_URL')
+KEYCLOAK_ISSUER = os.environ.get('KEYCLOAK_ISSUER')
 AUDIENCE = os.environ.get('AUDIENCE')
-jwk_client = PyJWKClient(JWKS_URL) if JWKS_URL else None
+
+if not JWKS_URL:
+    raise RuntimeError("CRITICAL: KEYCLOAK_JWKS_URL environment variable is required.")
+
+jwk_client = PyJWKClient(JWKS_URL)
+
+def require_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return jsonify({"error": "Missing or invalid Authorization header"}), 401
+
+        token = auth_header.split(" ")[1]
+
+        try:
+            signing_key = jwk_client.get_signing_key_from_jwt(token)
+            options = {"verify_aud": bool(AUDIENCE)}
+
+            kwargs_jwt = {
+                "jwt": token,
+                "key": signing_key.key,
+                "algorithms": ["RS256"],
+                "options": options,
+            }
+            if AUDIENCE:
+                kwargs_jwt["audience"] = AUDIENCE
+            if KEYCLOAK_ISSUER:
+                kwargs_jwt["issuer"] = KEYCLOAK_ISSUER
+
+            payload = jwt.decode(**kwargs_jwt)
+            request.user_id = payload.get("sub")
+
+            if not request.user_id:
+                return jsonify({"error": "Unauthorized: Token missing sub claim"}), 401
+
+        except Exception as e:
+            logger.warning("JWT Verification Failed: %s", e)
+            return jsonify({"error": "Unauthorized or invalid token"}), 401
+
+        return f(*args, **kwargs)
+
+    return decorated
 
 
 # ================================================================================================ #
@@ -91,35 +143,6 @@ class Profile(db.Model):
 
 
 # ================================================================================================ #
-# ========== Helper ============================================================================== #
-# ================================================================================================ #
-def _get_user_id():
-    auth_header = request.headers.get("Authorization", "")
-    if auth_header.startswith("Bearer "):
-        token = auth_header.split(" ")[1]
-        try:
-            if jwk_client:
-                signing_key = jwk_client.get_signing_key_from_jwt(token)
-                options = {"verify_aud": bool(AUDIENCE)}
-                payload = jwt.decode(
-                    token,
-                    signing_key.key,
-                    algorithms=["RS256"],
-                    audience=AUDIENCE if AUDIENCE else None,
-                    options=options
-                )
-            else:
-                payload = jwt.decode(token, options={"verify_signature": False})
-            
-            return payload.get("sub")
-        except Exception as e:
-            print(f"JWT Verification Failed: {e}")
-            return None
-
-    return None
-
-
-# ================================================================================================ #
 # ========== Routes ============================================================================== #
 # ================================================================================================ #
 @app.route("/health", methods=["GET"])
@@ -128,16 +151,15 @@ def health():
 
 
 @app.route("/profiles/me", methods=["GET"])
+@require_auth
 def get_my_profile():
     """
     Returns the logged in user profile.
     Auto-creates profile if missing on first request.
     """
-    user_id = _get_user_id()
-    if not user_id:
-        return jsonify({"error": "Unauthorized or invalid token"}), 401
+    user_id = request.user_id
 
-    profile = Profile.query.get(user_id)
+    profile = db.session.get(Profile, user_id)
     if not profile:
         profile = Profile(user_id=user_id)
         db.session.add(profile)
@@ -147,19 +169,16 @@ def get_my_profile():
 
 
 @app.route("/profiles/me", methods=["PATCH"])
+@require_auth
 def update_my_profile():
     """
     Updates fields on the logged-in user's profile.
-    Auto-creates profile if missing before patching.
     """
-    user_id = _get_user_id()
-    if not user_id:
-        return jsonify({"error": "Unauthorized or invalid token"}), 401
+    user_id = request.user_id
 
-    profile = Profile.query.get(user_id)
+    profile = db.session.get(Profile, user_id)
     if not profile:
-        profile = Profile(user_id=user_id)
-        db.session.add(profile)
+        return jsonify({"error": "this user doesnt have a profile"})
 
     body = request.get_json(silent=True) or {}
 
@@ -186,4 +205,4 @@ def update_my_profile():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(host='0.0.0.0', port=3000, debug=True)
+    app.run(host='0.0.0.0', port=PORT, debug=True)

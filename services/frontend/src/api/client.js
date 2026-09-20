@@ -1,13 +1,15 @@
 import keycloak from '../lib/keycloak'
 
-export async function apiFetch(url, options = {}) {
-  try {
-    await keycloak.updateToken(30) // refreshes the token if it expires within 30s
-  } catch {
-    await keycloak.login()
-  }
-  return fetch(url, {
+// Call the API with the user's token. Resolves with the JSON response;
+// throws an Error with the server's message when the request fails.
+export async function api(url, { body, ...options } = {}) {
+  await keycloak.updateToken(30) // renews the token if it expires within 30s
+  const res = await fetch(url, {
     ...options,
-    headers: { ...options.headers, Authorization: `Bearer ${keycloak.token}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${keycloak.token}` },
+    body: body && JSON.stringify(body),
   })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`)
+  return data
 }

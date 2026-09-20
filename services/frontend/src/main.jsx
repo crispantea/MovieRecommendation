@@ -8,7 +8,9 @@ const root = createRoot(document.getElementById('root'))
 root.render(<p>Signing you in...</p>)
 
 // Log in FIRST, render the app AFTER.
-// The app only renders once the user is authenticated, so it needs no route guards.
+// If the session expires and the token can't be renewed, send the user back to sign in.
+keycloak.onAuthRefreshError = () => keycloak.login()
+
 keycloak
   .init({ onLoad: 'login-required', pkceMethod: 'S256' })
   .then(() => {

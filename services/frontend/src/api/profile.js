@@ -1,12 +1,6 @@
-import { apiFetch } from './client'
+import { api } from './client'
 
-export async function getMyProfile() {
-  return apiFetch('/api/profiles/me')
-}
+export const getMyProfile = () => api('/api/profiles/me')
 
-export async function updateMyProfile(updates) {
-  return apiFetch('/api/profiles/me', {
-    method: 'PATCH',
-    body: JSON.stringify(updates),
-  })
-}
+export const updateMyProfile = (updates) =>
+  api('/api/profiles/me', { method: 'PATCH', body: updates })

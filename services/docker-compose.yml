@@ -146,8 +146,8 @@ services:
       context: ./frontend
     environment:
       PORT: ${FRONTEND_PORT}
-      VITE_API_URL: http://localhost:${PROFILES_HOST_PORT}
-      VITE_INFERENCE_URL: http://localhost:${INFERENCE_HOST_PORT}
+      PROFILES_SERVICE_URL: http://profiles-service:${PROFILES_PORT}
+      INFERENCE_SERVICE_URL: http://inference-service:${INFERENCE_PORT}
       VITE_KEYCLOAK_URL: http://localhost:${KEYCLOAK_HOST_PORT}
       VITE_KEYCLOAK_APP_REALM: ${KEYCLOAK_APP_REALM}
       VITE_KEYCLOAK_APP_CLIENT_ID: ${KEYCLOAK_APP_CLIENT_ID}
