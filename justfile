@@ -37,6 +37,9 @@ auth-service:
     terraform -chdir={{tf_dir}} init -input=false && \
     terraform -chdir={{tf_dir}} apply -auto-approve -target=module.auth
 
+build:
+    {{compose}} build --no-cache
+
 # Full stack startup
 up: auth-service
     {{compose}} up -d --wait

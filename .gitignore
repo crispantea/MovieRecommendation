@@ -29,3 +29,4 @@ services/authorization/import/realm-export.json
 # ----------------------------------------------
 
 .env.secrets
+.venv/

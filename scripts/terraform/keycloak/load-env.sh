@@ -37,6 +37,7 @@ fi
 # Export terraform input variables
 export TF_VAR_keycloak_url="http://localhost:${KEYCLOAK_HOST_PORT}"
 export TF_VAR_frontend_url="http://localhost:${FRONTEND_HOST_PORT}"
+
 export TF_VAR_keycloak_realm="${KEYCLOAK_TERRAFORM_REALM}"
 export TF_VAR_keycloak_client_id="${KEYCLOAK_TERRAFORM_CLIENT_ID}"
 export TF_VAR_keycloak_client_secret="${KEYCLOAK_TERRAFORM_SECRET}"

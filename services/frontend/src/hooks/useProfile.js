@@ -8,8 +8,6 @@ const ALLOWED_GENRES = [
 ]
 
 export function useProfile() {
-  const userId = localStorage.getItem('user_id')
-
   const [profile, setProfile] = useState(null)
   const [favoriteGenres, setFavoriteGenres] = useState([])
   const [favoriteActors, setFavoriteActors] = useState('')
@@ -24,7 +22,7 @@ export function useProfile() {
   const [success, setSuccess] = useState('')
 
   useEffect(() => {
-    getMyProfile(userId)
+    getMyProfile()
       .then((data) => {
         setProfile(data)
         setFavoriteGenres(data.favorite_genres || [])
@@ -34,7 +32,7 @@ export function useProfile() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
-  }, [userId])
+  }, [])
 
   function toggleGenre(genre) {
     setFavoriteGenres((prev) =>
@@ -60,7 +58,7 @@ export function useProfile() {
     setSaving(true)
 
     try {
-      const updated = await updateMyProfile(userId, {
+      const updated = await updateMyProfile({
         favorite_genres: favoriteGenres,
         favorite_actors: favoriteActors
           .split(',')

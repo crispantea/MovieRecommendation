@@ -44,7 +44,6 @@ resource "keycloak_default_roles" "this" {
   realm_id = keycloak_realm.agi_project.id
   default_roles = [
     keycloak_role.user.name,
-    "account/manage-account", # lets users change their own password/profile (client/role syntax)
   ]
 }
 
@@ -62,7 +61,7 @@ resource "keycloak_openid_client" "agi_web" {
   pkce_code_challenge_method   = "S256"
 
   root_url                        = var.frontend_url
-  valid_redirect_uris             = ["${var.frontend_url}/*"] # path wildcard on our own origin only
+  valid_redirect_uris             = ["${var.frontend_url}/*"]
   valid_post_logout_redirect_uris = ["${var.frontend_url}/*"]
   web_origins                     = [var.frontend_url]
 
@@ -95,25 +94,4 @@ resource "keycloak_openid_audience_protocol_mapper" "audiences" {
   included_custom_audience = each.key
   add_to_id_token          = false
   add_to_access_token      = true
-}
-
-# First admin user
-resource "keycloak_user" "admin" {
-  realm_id       = keycloak_realm.agi_project.id
-  username       = var.admin_email
-  email          = var.admin_email
-  email_verified = true
-  enabled        = true
-
-  initial_password {
-    value     = var.admin_initial_password
-    temporary = true # forced to change at first login
-  }
-}
-
-resource "keycloak_user_roles" "admin" {
-  realm_id   = keycloak_realm.agi_project.id
-  user_id    = keycloak_user.admin.id
-  role_ids   = [keycloak_role.admin.id]
-  exhaustive = true
 }
