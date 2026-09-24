@@ -38,7 +38,7 @@ PROFILES_SERVICE_URL = os.environ.get("PROFILES_SERVICE_URL")
 
 # Ollama service
 MODEL_SERVER_URL = os.environ.get("MODEL_SERVER_URL")
-MODEL_NAME = os.environ.get("MODEL_NAME", "llama3.1:8b")
+MODEL_NAME = os.environ.get("MODEL_NAME", "qwen3:4b")
 MAX_LLM_RETRIES = int(os.environ.get("MAX_LLM_RETRIES", 2))
 REQUEST_TIMEOUT = int(os.environ.get("REQUEST_TIMEOUT", 600))
 

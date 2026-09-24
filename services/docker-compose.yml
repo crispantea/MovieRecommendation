@@ -81,6 +81,16 @@ services:
       AUDIENCE: ${INFERENCE_AUDIENCE}
     ports:
       - "${INFERENCE_HOST_PORT}:${INFERENCE_PORT}"
+    healthcheck:
+      test: ["CMD-SHELL", "curl http://localhost:${INFERENCE_PORT}/health"]
+      interval: 2s
+      timeout: 1s
+      retries: 5
+    depends_on:
+      profiles-service:
+        condition: service_healthy
+      inference-service-ollama:
+        condition: service_healthy
 
   inference-service-ollama:
     # ref: https://hub.docker.com/r/ollama/ollama
@@ -90,6 +100,16 @@ services:
       # - ollama_data:/root/.ollama
       - ./inference-service/ollama-init.sh:/ollama-init.sh
     entrypoint: ["/bin/sh", "/ollama-init.sh"]
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "ollama list | awk '{print $1}' | grep -qx 'qwen3:4b'"
+        ]
+      interval: 30s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
     ports:
       - "${OLLAMA_HOST_PORT}:11434"
 
@@ -110,6 +130,11 @@ services:
       AUDIENCE: ${PROFILES_AUDIENCE}
     ports:
       - "${PROFILES_HOST_PORT}:${PROFILES_PORT}"
+    healthcheck:
+      test: ["CMD-SHELL", "curl http://localhost:${PROFILES_PORT}/health"]
+      interval: 2s
+      timeout: 1s
+      retries: 5
     depends_on:
       profiles-service-database:
         condition: service_healthy
@@ -154,5 +179,7 @@ services:
     ports:
       - "${FRONTEND_HOST_PORT}:${FRONTEND_PORT}"
     depends_on:
-      - inference-service
-      - profiles-service
+      profiles-service:
+        condition: service_healthy
+      inference-service:
+        condition: service_healthy
