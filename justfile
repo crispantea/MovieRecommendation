@@ -51,3 +51,28 @@ clean:
 # Full wipe (containers down + remove generated secrets)
 destroy: clean
     rm -f {{secrets_file}} {{services_dir}}/authorization/import/realm-export.json
+
+# ================================================================================================ #
+# ========== Infrastructure ====================================================================== #
+# ================================================================================================ #
+project_dir := "/root/agi-project"
+infra_dir := project_dir + "/infra-gc"
+
+mgmt-up:
+	docker build -t mgmt ./mgmt
+	docker run --rm --name mgmt --hostname mgmt -v "$(pwd):{{project_dir}}" -d mgmt
+
+mgmt-down:
+	docker stop mgmt
+
+infra-init:
+    docker exec -it mgmt terraform -chdir={{infra_dir}} init
+
+infra-plan:
+    docker exec -it mgmt terraform -chdir={{infra_dir}} plan
+
+infra-apply:
+    docker exec -it mgmt terraform -chdir={{infra_dir}} apply
+
+infra-destroy:
+    docker exec -it mgmt terraform -chdir={{infra_dir}} destroy
