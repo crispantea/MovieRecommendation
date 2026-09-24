@@ -15,7 +15,7 @@ import requests
 # ========== Configuration ======================================================================= #
 # ================================================================================================ #
 MODEL_SERVER_URL = os.environ.get("MODEL_SERVER_URL", "http://localhost:11434")
-MODEL_NAME = os.environ.get("MODEL_NAME", "qwen3:4b")
+MODEL_NAME = os.environ.get("MODEL_NAME", "llama3.2:1b")
 MAX_LLM_RETRIES = int(os.environ.get("MAX_LLM_RETRIES", 2))
 REQUEST_TIMEOUT = int(os.environ.get("REQUEST_TIMEOUT", 60))
 

@@ -9,7 +9,7 @@ until ollama list >/dev/null 2>&1; do
 done
 
 # Pull the image (uses the server)
-ollama pull qwen3:4b
+ollama pull llama3.2:1b
 
 # Avoid terminating the container
 wait

@@ -76,7 +76,7 @@ services:
       PORT: ${INFERENCE_PORT}
       PROFILES_SERVICE_URL: http://profiles-service:${PROFILES_PORT}
       MODEL_SERVER_URL: http://inference-service-ollama:11434
-      KEYCLOAK_ISSUER: http://localhost:${KEYCLOAK_HOST_PORT}/realms/${KEYCLOAK_APP_REALM}
+      KEYCLOAK_ISSUER: http://localhost:8080/realms/${KEYCLOAK_APP_REALM} # TODO: Why localhost???
       KEYCLOAK_JWKS_URL: http://auth-service:8080/realms/${KEYCLOAK_APP_REALM}/protocol/openid-connect/certs
       AUDIENCE: ${INFERENCE_AUDIENCE}
     ports:
@@ -104,7 +104,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "ollama list | awk '{print $1}' | grep -qx 'qwen3:4b'"
+          "ollama list | awk '{print $1}' | grep -qx 'llama3.2:1b'"
         ]
       interval: 30s
       timeout: 3s
@@ -125,7 +125,7 @@ services:
     environment:
       PORT: ${PROFILES_PORT}
       DATABASE_URL: postgresql://${PROFILES_DB_USER}:${PROFILES_DB_PASSWORD}@profiles-service-database:5432/${PROFILES_DB_NAME}
-      KEYCLOAK_ISSUER: http://localhost:${KEYCLOAK_HOST_PORT}/realms/${KEYCLOAK_APP_REALM}
+      KEYCLOAK_ISSUER: http://localhost:8080/realms/${KEYCLOAK_APP_REALM} # TODO: Why localhost???
       KEYCLOAK_JWKS_URL: http://auth-service:8080/realms/${KEYCLOAK_APP_REALM}/protocol/openid-connect/certs
       AUDIENCE: ${PROFILES_AUDIENCE}
     ports:
