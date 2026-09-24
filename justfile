@@ -74,5 +74,8 @@ infra-plan:
 infra-apply:
     docker exec -it mgmt terraform -chdir={{infra_dir}} apply
 
+infra-output:
+    docker exec -it mgmt terraform -chdir={{infra_dir}} output
+
 infra-destroy:
     docker exec -it mgmt terraform -chdir={{infra_dir}} destroy
