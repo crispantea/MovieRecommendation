@@ -6,6 +6,6 @@ output "master_ssh" {
  value = module.compute.master_ssh
 }
 
-output "worker_IPs"  {
-  value = module.compute.worker_IPs
+output "workers"  {
+  value = module.compute.workers
 }

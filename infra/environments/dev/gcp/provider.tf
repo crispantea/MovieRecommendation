@@ -5,3 +5,5 @@ provider "google" {
   project = var.GCP_PROJECT_ID
   zone = var.GCP_ZONE
 }
+
+provider "local" {}

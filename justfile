@@ -13,6 +13,7 @@ env_file     := ".env"
 services_dir := "services"
 scripts_dir  := "scripts"
 tf_dir       := "infra/environments/dev"
+ansible_dir  := "ansible"
 
 # This uses the variables defined in the env files provided and fills the required vars in the docker compose file
 compose      := "docker compose --env-file " + env_file + " --env-file " + secrets_file + " -f " + services_dir + "/docker-compose.yml"
@@ -83,8 +84,13 @@ cloud-init target="":
 cloud-plan target="":
     {{cmd}} terraform -chdir={{tf_gcp_dir}} plan
 
+# TODO: Add a sort of a health check to the ansible files because it fails if 
 cloud-apply target="":
     {{cmd}} terraform -chdir={{tf_gcp_dir}} apply
+    {{cmd}} ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i "{{ansible_dir}}/gcphosts" "{{ansible_dir}}/ansible-gcp-configure-nodes.yml"
+    {{cmd}} ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i "{{ansible_dir}}/gcphosts" "{{ansible_dir}}/ansible-k8s-install.yml"
+    {{cmd}} ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i "{{ansible_dir}}/gcphosts" "{{ansible_dir}}/ansible-create-cluster.yml"
+    {{cmd}} ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i "{{ansible_dir}}/gcphosts" "{{ansible_dir}}/ansible-workers-join.yml"
 
 cloud-output target="":
     {{cmd}} terraform -chdir={{tf_gcp_dir}} output
