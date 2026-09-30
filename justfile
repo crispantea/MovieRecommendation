@@ -24,39 +24,51 @@ compose      := "docker compose --env-file " + env_file + " --env-file " + secre
 export SERVICES_DIR := services_dir
 export SECRETS_FILE := secrets_file
 
-# --------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------ #
+# Local / Docker Compose Stack
+# ------------------------------------------------------------------------------------------------ #
+tf_auth_dir := tf_dir + "/auth"
 
 # Initialize secrets and hydrate keycloak templates
-init:
+local-init:
     bash {{scripts_dir}}/bootstrap.sh
 
 # Start Keycloak container and wait until ready/healthy
-auth-service:
+local-auth-service:
     {{compose}} up -d --wait auth-service
     . {{scripts_dir}}/terraform/keycloak/load-env.sh && \
-    terraform -chdir={{tf_dir}} init -input=false && \
-    terraform -chdir={{tf_dir}} apply -auto-approve -target=module.auth
+    terraform -chdir={{tf_auth_dir}} init -input=false && \
+    terraform -chdir={{tf_auth_dir}} apply -auto-approve
 
-build:
+local-build:
     {{compose}} build --no-cache
 
 # Full stack startup
-up: auth-service
+local-up: local-auth-service
     {{compose}} up -d --wait
 
 # Tear down all running containers
-clean:
+local-down:
     {{compose}} down
 
 # Full wipe (containers down + remove generated secrets)
-destroy: clean
+local-destroy: local-down
     rm -f {{secrets_file}} {{services_dir}}/authorization/import/realm-export.json
 
-# ================================================================================================ #
-# ========== Infrastructure ====================================================================== #
-# ================================================================================================ #
+# ------------------------------------------------------------------------------------------------ #
+# Local Kubernetes / Kind Stack
+# ------------------------------------------------------------------------------------------------ #
+
+# TDB ...
+
+# ------------------------------------------------------------------------------------------------ #
+# Cloud Kubernetes / Production Stack
+# ------------------------------------------------------------------------------------------------ #
 project_dir := "/root/agi-project"
-infra_dir := project_dir + "/infra-gc"
+tf_gcp_dir := tf_dir + "/gcp"
+
+target := ""
+cmd := if target != "" { "docker exec -it " + target + " " } else { "" }
 
 mgmt-up:
 	docker build -t mgmt ./mgmt
@@ -65,17 +77,17 @@ mgmt-up:
 mgmt-down:
 	docker stop mgmt
 
-infra-init:
-    docker exec -it mgmt terraform -chdir={{infra_dir}} init
+cloud-init target="":
+    {{cmd}} terraform -chdir={{tf_gcp_dir}} init
 
-infra-plan:
-    docker exec -it mgmt terraform -chdir={{infra_dir}} plan
+cloud-plan target="":
+    {{cmd}} terraform -chdir={{tf_gcp_dir}} plan
 
-infra-apply:
-    docker exec -it mgmt terraform -chdir={{infra_dir}} apply
+cloud-apply target="":
+    {{cmd}} terraform -chdir={{tf_gcp_dir}} apply
 
-infra-output:
-    docker exec -it mgmt terraform -chdir={{infra_dir}} output
+cloud-output target="":
+    {{cmd}} terraform -chdir={{tf_gcp_dir}} output
 
-infra-destroy:
-    docker exec -it mgmt terraform -chdir={{infra_dir}} destroy
+cloud-destroy target="":
+    {{cmd}} terraform -chdir={{tf_gcp_dir}} destroy

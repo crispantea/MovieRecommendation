@@ -23,6 +23,11 @@
 # Generated file with confidential secret
 services/authorization/import/realm-export.json
 
+# ----------------------------------------------
+# GCP
+# ----------------------------------------------
+
+credentials.json
 
 # ----------------------------------------------
 # GENERAL
