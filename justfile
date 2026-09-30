@@ -14,6 +14,7 @@ services_dir := "services"
 scripts_dir  := "scripts"
 tf_dir       := "infra/environments/dev"
 ansible_dir  := "ansible"
+manifests_dir := "manifests"
 
 # This uses the variables defined in the env files provided and fills the required vars in the docker compose file
 compose      := "docker compose --env-file " + env_file + " --env-file " + secrets_file + " -f " + services_dir + "/docker-compose.yml"
@@ -59,8 +60,17 @@ local-destroy: local-down
 # ------------------------------------------------------------------------------------------------ #
 # Local Kubernetes / Kind Stack
 # ------------------------------------------------------------------------------------------------ #
+kind_manifests_dir := manifests_dir + "/kind"
+cluster_name := "cluster-psia2026"
 
-# TDB ...
+kind-init:
+    echo {{kind_manifests_dir}}
+    kind create cluster --config="{{kind_manifests_dir}}/kind-cluster.yaml" --name={{cluster_name}}
+
+# TODO: add targets to deploy our manifests into the cluster
+
+kind-destroy:
+    kind delete cluster --name={{cluster_name}}
 
 # ------------------------------------------------------------------------------------------------ #
 # Cloud Kubernetes / Production Stack
