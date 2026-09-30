@@ -28,6 +28,7 @@ services/authorization/import/realm-export.json
 # ----------------------------------------------
 
 credentials.json
+gcphosts
 
 # ----------------------------------------------
 # GENERAL
