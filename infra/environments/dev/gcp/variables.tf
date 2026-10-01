@@ -17,5 +17,5 @@ variable "GCP_ZONE" {
 variable "public_key_path" {
   type        = string
   description = "File path to the SSH public key for authenticating as the 'ubuntu' user."
-  default     = "/root/.ssh/id_rsa"
+  default     = "/root/.ssh/id_rsa.pub"
 }

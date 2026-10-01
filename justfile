@@ -82,35 +82,61 @@ kind-destroy:
 # ------------------------------------------------------------------------------------------------ #
 # Cloud Kubernetes / Production Stack
 # ------------------------------------------------------------------------------------------------ #
-project_dir := "/root/agi-project"
 tf_gcp_dir := tf_dir + "/gcp"
 
-target := ""
-cmd := if target != "" { "docker exec -it " + target + " " } else { "" }
+mgmt_cmd := "docker exec -it mgmt"
+mgmt_project_dir := "/root/agi-project"
+mgmt_tf_gcp_dir := mgmt_project_dir + "/" + tf_gcp_dir
+mgmt_ansible_dir := mgmt_project_dir + "/" + ansible_dir
 
 mgmt-up:
 	docker build -t mgmt ./mgmt
-	docker run --rm --name mgmt --hostname mgmt -v "$(pwd):{{project_dir}}" -d mgmt
+	docker run --rm --name mgmt --hostname mgmt -v "$(pwd):{{mgmt_project_dir}}" -d mgmt
 
 mgmt-down:
 	docker stop mgmt
 
 cloud-init target="":
-    {{cmd}} terraform -chdir={{tf_gcp_dir}} init
+    if [ "{{target}}" = "local" ]; then \
+        terraform -chdir={{tf_gcp_dir}} init; \
+    else \
+        {{mgmt_cmd}} terraform -chdir={{mgmt_tf_gcp_dir}} init; \
+    fi
 
 cloud-plan target="":
-    {{cmd}} terraform -chdir={{tf_gcp_dir}} plan
+    if [ "{{target}}" = "local" ]; then \
+        terraform -chdir={{tf_gcp_dir}} plan; \
+    else \
+        {{mgmt_cmd}} terraform -chdir={{mgmt_tf_gcp_dir}} plan; \
+    fi
 
-# TODO: Add a sort of a health check to the ansible files because it fails if 
 cloud-apply target="":
-    {{cmd}} terraform -chdir={{tf_gcp_dir}} apply
-    {{cmd}} ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i "{{ansible_dir}}/gcphosts" "{{ansible_dir}}/ansible-gcp-configure-nodes.yml"
-    {{cmd}} ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i "{{ansible_dir}}/gcphosts" "{{ansible_dir}}/ansible-k8s-install.yml"
-    {{cmd}} ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i "{{ansible_dir}}/gcphosts" "{{ansible_dir}}/ansible-create-cluster.yml"
-    {{cmd}} ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i "{{ansible_dir}}/gcphosts" "{{ansible_dir}}/ansible-workers-join.yml"
+    if [ "{{target}}" = "local" ]; then \
+        terraform -chdir={{tf_gcp_dir}} apply; \
+    else \
+        {{mgmt_cmd}} terraform -chdir={{mgmt_tf_gcp_dir}} apply; \
+    fi
+
+cloud-ansible target="": cloud-apply
+    if [ "{{target}}" = "local" ]; then \
+        ANSIBLE_CONFIG="{{ansible_dir}}/ansible.cfg" ansible-playbook "{{ansible_dir}}/site.yml"; \
+    else \
+        {{mgmt_cmd}} env ANSIBLE_CONFIG="{{mgmt_ansible_dir}}/ansible.cfg" ansible-playbook "{{mgmt_ansible_dir}}/site.yml"; \
+    fi
+
+# TODO: Add k8s manifests
+# cloud-deploy target="": cloud-apply cloud-ansible
 
 cloud-output target="":
-    {{cmd}} terraform -chdir={{tf_gcp_dir}} output
+    if [ "{{target}}" = "local" ]; then \
+        terraform -chdir={{tf_gcp_dir}} output; \
+    else \
+        {{mgmt_cmd}} terraform -chdir={{mgmt_tf_gcp_dir}} output; \
+    fi
 
 cloud-destroy target="":
-    {{cmd}} terraform -chdir={{tf_gcp_dir}} destroy
+    if [ "{{target}}" = "local" ]; then \
+        terraform -chdir={{tf_gcp_dir}} destroy; \
+    else \
+        {{mgmt_cmd}} terraform -chdir={{mgmt_tf_gcp_dir}} destroy; \
+    fi

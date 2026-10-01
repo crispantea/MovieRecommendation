@@ -1,11 +1,10 @@
 ---
-- hosts: "targets"
-  remote_user: ubuntu
+- hosts: all
   become: yes
-  become_method: sudo
-  become_user: root
   gather_facts: yes
   connection: ssh
+  become_method: sudo
+  become_user: root
   tasks:
     - name: Create containerd config file
       file:

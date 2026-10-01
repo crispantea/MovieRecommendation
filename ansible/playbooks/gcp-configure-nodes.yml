@@ -6,12 +6,13 @@
 # a third one to install software in the Load Balancer server
 
 # This First Play Sets up critical configuration on servers
-- hosts: targets
+- hosts: all
   # as the systems are not yet "known" by Ansible Facts cannot be gathered yet
   gather_facts: no
-  remote_user: ubuntu
   become: yes
+  connection: ssh
   become_method: sudo
+  become_user: root
 
   pre_tasks:
     - name: Wait for instances to become reachable via SSH

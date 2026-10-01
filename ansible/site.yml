@@ -1,0 +1,4 @@
+- import_playbook: playbooks/gcp-configure-nodes.yml
+- import_playbook: playbooks/k8s-install.yml
+- import_playbook: playbooks/create-cluster.yml
+- import_playbook: playbooks/workers-join.yml

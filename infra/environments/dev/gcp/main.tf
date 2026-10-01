@@ -11,13 +11,27 @@ module "compute" {
 }
 
 resource "local_file" "ansible_inventory" {
-  filename = "${path.module}/../../../../ansible/gcphosts"
+  filename        = "${path.module}/../../../../ansible/inventory/hosts.yml"
+  file_permission = "0644"
 
-  content = templatefile("${path.module}/../../../../ansible/gcphosts.template", {
-    master_name = module.compute.master.name
-    master_ip   = module.compute.master.ip
-    public_key_path = var.public_key_path
-
-    workers = module.compute.workers
+  content = yamlencode({
+    all = {
+      children = {
+        master = {
+          hosts = {
+            (module.compute.master.name) = {
+              ansible_host = module.compute.master.ip
+            }
+          }
+        }
+        workers = {
+          hosts = {
+            for w in module.compute.workers : w.name => {
+              ansible_host = w.ip
+            }
+          }
+        }
+      }
+    }
   })
 }
