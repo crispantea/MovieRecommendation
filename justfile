@@ -65,7 +65,7 @@ cluster_name := "cluster-psia2026"
 kind-init:
     kind create cluster --config="{{manifests_dir}}/kind-cluster.yaml" --name={{cluster_name}}
 
-kind-load-images:
+kind-load-images: kind-init
     kind load docker-image agi-frontend:latest --name cluster-psia2026
 
 kind-deploy: kind-load-images

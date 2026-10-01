@@ -3,7 +3,6 @@ nginx-ingress:
     nodeSelector:
       kubernetes.io/hostname: cluster-psia2026-worker
     allowEmptyIngressHost: true
-    hostNetwork: true
     hostPort:
       enable: true
       http: 80
