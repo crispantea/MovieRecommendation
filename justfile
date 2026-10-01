@@ -60,17 +60,21 @@ local-destroy: local-down
 # ------------------------------------------------------------------------------------------------ #
 # Local Kubernetes / Kind Stack
 # ------------------------------------------------------------------------------------------------ #
-kind_manifests_dir := manifests_dir + "/kind"
 cluster_name := "cluster-psia2026"
 
 kind-init:
-    echo {{kind_manifests_dir}}
-    kind create cluster --config="{{kind_manifests_dir}}/kind-cluster.yaml" --name={{cluster_name}}
+    kind create cluster --config="{{manifests_dir}}/kind-cluster.yaml" --name={{cluster_name}}
 
 kind-load-images:
     kind load docker-image agi-frontend:latest --name cluster-psia2026
 
-# TODO: add targets to deploy our manifests into the cluster
+kind-deploy: kind-load-images
+    # Ingress Controller
+    helm dependency build "{{manifests_dir}}/ingress-controller/base"
+    helm upgrade --install nginx-ingress "{{manifests_dir}}/ingress-controller/base" --namespace nginx-ingress --create-namespace --wait
+
+    # Frontend
+    kubectl apply -k "{{manifests_dir}}/frontend/overlays/prod"
 
 kind-destroy:
     kind delete cluster --name={{cluster_name}}
