@@ -67,6 +67,9 @@ kind-init:
     echo {{kind_manifests_dir}}
     kind create cluster --config="{{kind_manifests_dir}}/kind-cluster.yaml" --name={{cluster_name}}
 
+kind-load-images:
+    kind load docker-image agi-frontend:latest --name cluster-psia2026
+
 # TODO: add targets to deploy our manifests into the cluster
 
 kind-destroy:

@@ -15,4 +15,5 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ../../../services/frontend
+          image: agi-frontend
+          imagePullPolicy: Never

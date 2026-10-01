@@ -6,3 +6,4 @@ resources:
   - deployment.yaml
   - service.yaml
   - netpolicy.yaml
+  - ingress.yaml
