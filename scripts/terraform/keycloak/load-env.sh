@@ -12,6 +12,7 @@ REQUIRED_ENV_VARS=(
   "KEYCLOAK_TERRAFORM_REALM"
   "PROFILES_AUDIENCE"
   "INFERENCE_AUDIENCE"
+  "MOVIES_AUDIENCE"
 )
 
 for var in "${REQUIRED_ENV_VARS[@]}"; do
@@ -41,6 +42,6 @@ export TF_VAR_frontend_url="http://localhost:${FRONTEND_HOST_PORT}"
 export TF_VAR_keycloak_realm="${KEYCLOAK_TERRAFORM_REALM}"
 export TF_VAR_keycloak_client_id="${KEYCLOAK_TERRAFORM_CLIENT_ID}"
 export TF_VAR_keycloak_client_secret="${KEYCLOAK_TERRAFORM_SECRET}"
-export TF_VAR_audiences="[\"${PROFILES_AUDIENCE}\",\"${INFERENCE_AUDIENCE}\"]"
+export TF_VAR_audiences="[\"${PROFILES_AUDIENCE}\",\"${INFERENCE_AUDIENCE}\",\"${MOVIES_AUDIENCE}\"]"
 
 echo "Terraform keycloak environment variables configured successfully."

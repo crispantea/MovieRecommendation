@@ -75,6 +75,7 @@ services:
     environment:
       PORT: ${INFERENCE_PORT}
       PROFILES_SERVICE_URL: http://profiles-service:${PROFILES_PORT}
+      MOVIES_SERVICE_URL: http://movies-service:${MOVIES_PORT}
       MODEL_SERVER_URL: http://inference-service-ollama:11434
       KEYCLOAK_ISSUER: http://localhost:8080/realms/${KEYCLOAK_APP_REALM} # TODO: Why localhost???
       KEYCLOAK_JWKS_URL: http://auth-service:8080/realms/${KEYCLOAK_APP_REALM}/protocol/openid-connect/certs
@@ -88,6 +89,8 @@ services:
       retries: 5
     depends_on:
       profiles-service:
+        condition: service_healthy
+      movies-service:
         condition: service_healthy
       inference-service-ollama:
         condition: service_healthy
@@ -162,6 +165,58 @@ services:
 
 
   # ============================================================================================== #
+  # ========== Movies Catalog Service ============================================================ #
+  # ============================================================================================== #
+  movies-service:
+    image: agi-movies-service
+    build:
+      context: ./movies-service
+    container_name: movies-service
+    environment:
+      PORT: ${MOVIES_PORT}
+      DATABASE_URL: postgresql://${MOVIES_DB_USER}:${MOVIES_DB_PASSWORD}@movies-service-database:5432/${MOVIES_DB_NAME}
+      KEYCLOAK_ISSUER: http://localhost:${KEYCLOAK_HOST_PORT}/realms/${KEYCLOAK_APP_REALM}
+      KEYCLOAK_JWKS_URL: http://auth-service:8080/realms/${KEYCLOAK_APP_REALM}/protocol/openid-connect/certs
+      AUDIENCE: ${MOVIES_AUDIENCE}
+      USE_TEMPLATE_DB: ${USE_TEMPLATE_DB:-true}
+      DISABLE_AUTH: ${DISABLE_AUTH:-false}
+    ports:
+      - "${MOVIES_HOST_PORT}:${MOVIES_PORT}"
+    volumes:
+      - ./movies-service/data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:${MOVIES_PORT}/health || exit 1"]
+      interval: 2s
+      timeout: 1s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      movies-service-database:
+        condition: service_healthy
+
+  movies-service-database:
+    # ref: https://hub.docker.com/_/postgres
+    image: postgres:18.6
+    container_name: movies-service-database
+    restart: always
+    shm_size: 128mb
+    environment:
+      POSTGRES_USER: ${MOVIES_DB_USER}
+      POSTGRES_PASSWORD: ${MOVIES_DB_PASSWORD}
+      POSTGRES_DB: ${MOVIES_DB_NAME}
+      PGDATA: /var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 2s
+      timeout: 1s
+      retries: 5
+    volumes:
+      - movies_db_data:/var/lib/postgresql/data
+    ports:
+      - "${MOVIES_DB_HOST_PORT}:5432"
+
+
+  # ============================================================================================== #
   # ========== Frontend Service ================================================================== #
   # ============================================================================================== #
   frontend:
@@ -173,9 +228,9 @@ services:
       PORT: ${FRONTEND_PORT}
       PROFILES_SERVICE_URL: http://profiles-service:${PROFILES_PORT}
       INFERENCE_SERVICE_URL: http://inference-service:${INFERENCE_PORT}
-      VITE_KEYCLOAK_URL: http://localhost:${KEYCLOAK_HOST_PORT}
-      VITE_KEYCLOAK_APP_REALM: ${KEYCLOAK_APP_REALM}
-      VITE_KEYCLOAK_APP_CLIENT_ID: ${KEYCLOAK_APP_CLIENT_ID}
+      KEYCLOAK_URL: http://localhost:${KEYCLOAK_HOST_PORT}
+      KEYCLOAK_APP_REALM: ${KEYCLOAK_APP_REALM}
+      KEYCLOAK_APP_CLIENT_ID: ${KEYCLOAK_APP_CLIENT_ID}
     ports:
       - "${FRONTEND_HOST_PORT}:${FRONTEND_PORT}"
     depends_on:
@@ -183,3 +238,6 @@ services:
         condition: service_healthy
       inference-service:
         condition: service_healthy
+
+volumes:
+  movies_db_data:
