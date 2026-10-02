@@ -95,6 +95,20 @@ kind-deploy: kind-load-images
     # Deploy Frontend
     kubectl apply -k "{{manifests_dir}}/frontend/overlays/prod"  --wait
 
+    # Build and deploy keyclaok wrapper (already comes with the httproute, secrets and configmap used on keycloak)
+    helm dependency build "{{manifests_dir}}/keycloak/base"
+
+    # Ugly workaround because apt justfile version is very old and therefore this:
+    # set dotenv-filename = [".env", ".env.secrets"]  doesnt work in the current version, we can update it, but it
+    # requires everyone to update it using binary installation
+    set -a; [ -f {{env_file}} ] && . ./{{env_file}}; [ -f {{secrets_file}} ] && . ./{{secrets_file}}; set +a; \
+    envsubst < "{{manifests_dir}}/keycloak/base/values.yaml" | \
+    helm upgrade --install keycloak "{{manifests_dir}}/keycloak/base" \
+    -n keycloak \
+    --create-namespace \
+    --wait \
+    -f -
+
 kind-clean: 
     kind delete cluster --name={{cluster_name}}
 
