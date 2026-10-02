@@ -6,13 +6,13 @@ export function useRecommendations() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  async function fetchRecommendations(candidates = [], message = null) {
+  async function fetchRecommendations(message = null) {
     setError('')
     setLoading(true)
     setRecommendations([])
 
     try {
-      const data = await getRecommendations(candidates, message)
+      const data = await getRecommendations(message)
       setRecommendations(data.recommendations)
     } catch (err) {
       setError(err.message)

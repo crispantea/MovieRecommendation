@@ -36,8 +36,6 @@ if __name__ == "__main__":
     res = requests.post(
         "http://localhost:8000/recommendations/generate",
         json={
-            "profile": TEST_PROFILE,
-            "candidates": "",
             "message": ""
         }
     )

@@ -49,6 +49,19 @@ local-build:
 local-up: local-auth-service
     {{compose}} up -d --wait
 
+# Manually trigger movie dataset seeding (respects USE_TEMPLATE_DB or falls back)
+seed-movies:
+    {{compose}} exec movies-service python seed_db.py
+
+# Manually trigger movie seeding specifically with template dataset
+seed-movies-template:
+    {{compose}} exec movies-service python seed_db.py --clear --template
+
+# Manually trigger movie bulk ingestion from full CSV dataset
+seed-movies-csv:
+    {{compose}} exec movies-service python seed_db.py --clear --csv
+
+
 # Tear down all running containers
 local-down:
     {{compose}} down

@@ -1,13 +1,15 @@
-# ref: https://hub.docker.com/_/node
-FROM node:26-alpine3.23
+FROM node:26 AS build
 
 WORKDIR /app
 
-COPY . .
+COPY package*.json ./
+RUN npm ci
 
-RUN npm install
+COPY . .
 RUN npm run build
 
-EXPOSE 5173
 
-CMD ["npm", "run", "start"]
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY 40-config.sh /docker-entrypoint.d/40-config.sh
+RUN chmod +x /docker-entrypoint.d/40-config.sh

@@ -33,8 +33,9 @@ app = Flask(__name__)
 # ================================================================================================ #
 PORT = int(os.environ.get("PORT", 8000))
 
-# Profiles service
-PROFILES_SERVICE_URL = os.environ.get("PROFILES_SERVICE_URL")
+# Internal Services
+PROFILES_SERVICE_URL = os.environ.get("PROFILES_SERVICE_URL", "http://profiles-service:3000")
+MOVIES_SERVICE_URL = os.environ.get("MOVIES_SERVICE_URL", "http://movies-service:3001")
 
 # Ollama service
 MODEL_SERVER_URL = os.environ.get("MODEL_SERVER_URL")
@@ -42,19 +43,30 @@ MODEL_NAME = os.environ.get("MODEL_NAME", "llama3.2:1b")
 MAX_LLM_RETRIES = int(os.environ.get("MAX_LLM_RETRIES", 2))
 REQUEST_TIMEOUT = int(os.environ.get("REQUEST_TIMEOUT", 600))
 
+# Candidate retrieval settings
+CANDIDATE_LIMIT = int(os.environ.get("CANDIDATE_LIMIT", 30))
+CANDIDATE_MIN_RATING = float(os.environ.get("CANDIDATE_MIN_RATING", 7.0))
+
 # Security / Keycloak Configuration
 KEYCLOAK_JWKS_URL = os.environ.get("KEYCLOAK_JWKS_URL")
 KEYCLOAK_ISSUER = os.environ.get("KEYCLOAK_ISSUER")
 AUDIENCE = os.environ.get("AUDIENCE")
+DISABLE_AUTH = os.environ.get("DISABLE_AUTH", "false").lower() in ("true", "1", "yes")
 
-if not KEYCLOAK_JWKS_URL:
-    raise RuntimeError("CRITICAL: KEYCLOAK_JWKS_URL environment variable is required for authentication.")
+jwks_client = PyJWKClient(KEYCLOAK_JWKS_URL) if KEYCLOAK_JWKS_URL else None
 
-jwks_client = PyJWKClient(KEYCLOAK_JWKS_URL)
 
 def require_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        if app.config.get("TESTING") or DISABLE_AUTH:
+            request.token_payload = {"sub": "test-user"}
+            return f(*args, **kwargs)
+
+        if not jwks_client:
+            logger.warning("Auth is required but KEYCLOAK_JWKS_URL is not set.")
+            return jsonify({"error": "Auth service not configured"}), 500
+
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
             return jsonify({"error": "Missing or invalid Authorization header"}), 401
@@ -65,7 +77,7 @@ def require_auth(f):
             signing_key = jwks_client.get_signing_key_from_jwt(token)
 
             decode_options = {"verify_aud": bool(AUDIENCE)}
-            
+
             kwargs_jwt = {
                 "jwt": token,
                 "key": signing_key.key,
@@ -116,6 +128,144 @@ RECOMMENDATION_SCHEMA = {
 # ================================================================================================ #
 # ========== Helpers ============================================================================= #
 # ================================================================================================ #
+def filter_and_prune_candidates(candidates: list, profile: dict) -> list[dict]:
+    """
+    Filters out watched movies and disliked genres, and prunes each movie to
+    essential fields: {"title": m.title, "year": m.release_year, "genres": m.genres}.
+    """
+    watched_titles = set()
+    for item in (profile.get("watch_history") or []):
+        if isinstance(item, dict):
+            t = item.get("title") or item.get("name")
+        elif isinstance(item, (str, int, float)):
+            t = str(item)
+        else:
+            t = None
+        if t is not None:
+            t_clean = str(t).strip().lower()
+            if t_clean:
+                watched_titles.add(t_clean)
+
+    disliked_raw = profile.get("disliked_genres") or []
+    if isinstance(disliked_raw, str):
+        disliked_list = [g.strip() for g in disliked_raw.split(",") if g.strip()]
+    elif isinstance(disliked_raw, (list, tuple, set)):
+        disliked_list = [str(g).strip() for g in disliked_raw if str(g).strip()]
+    else:
+        disliked_list = []
+    disliked_genres = {g.lower() for g in disliked_list}
+
+    seen_titles = set()
+    pruned = []
+
+    for m in (candidates or []):
+        if not isinstance(m, dict):
+            continue
+        title = m.get("title")
+        if title is None:
+            continue
+
+        title_clean = str(title).strip()
+        if not title_clean:
+            continue
+
+        title_lower = title_clean.lower()
+
+        # 1. Deduplicate by title
+        if title_lower in seen_titles:
+            continue
+
+        # 2. Exclude watched movies (case-insensitive title check)
+        if title_lower in watched_titles:
+            continue
+
+        # 3. Exclude movies matching any genre in disliked_genres
+        raw_genres = m.get("genres")
+        if isinstance(raw_genres, str):
+            genre_items = [g.strip() for g in raw_genres.split(",") if g.strip()]
+        elif isinstance(raw_genres, (list, tuple, set)):
+            genre_items = [str(g).strip() for g in raw_genres if str(g).strip()]
+        else:
+            genre_items = []
+
+        movie_genres = {g.lower() for g in genre_items}
+        if disliked_genres and (movie_genres & disliked_genres):
+            continue
+
+        year = m.get("release_year")
+        if year is None:
+            year = m.get("year")
+        try:
+            year = int(year) if year is not None else None
+        except (ValueError, TypeError):
+            year = None
+
+        seen_titles.add(title_lower)
+        pruned.append({
+            "title": title_clean,
+            "year": year,
+            "genres": genre_items,
+        })
+
+    return pruned
+
+
+def fetch_candidate_movies(profile: dict, headers: dict | None = None) -> list[dict]:
+    """
+    Queries movies-service for candidates matching user profile preferences,
+    filters out watched and disliked movies, prunes to minimal fields,
+    and returns a bounded pool of at most 30 movies.
+    """
+    req_headers = {}
+    if headers and "Authorization" in headers:
+        req_headers["Authorization"] = headers["Authorization"]
+
+    raw_favs = profile.get("favorite_genres") or []
+    if isinstance(raw_favs, str):
+        fav_list = [g.strip() for g in raw_favs.split(",") if g.strip()]
+    elif isinstance(raw_favs, (list, tuple, set)):
+        fav_list = [str(g).strip() for g in raw_favs if str(g).strip()]
+    else:
+        fav_list = []
+
+    min_year = profile.get("min_year")
+    try:
+        min_year = int(min_year) if min_year is not None else None
+    except (ValueError, TypeError):
+        min_year = None
+
+    params = {
+        "limit": CANDIDATE_LIMIT,
+        "sort_by": "rating",
+        "order": "desc",
+        "min_rating": CANDIDATE_MIN_RATING,
+    }
+    if fav_list:
+        params["genres"] = ",".join(fav_list)
+    if min_year is not None:
+        params["min_year"] = min_year
+
+    movies = []
+    try:
+        resp = requests.get(
+            f"{MOVIES_SERVICE_URL}/movies",
+            headers=req_headers,
+            params=params,
+            timeout=10,
+        )
+        if resp.ok:
+            data = resp.json()
+            movies = data.get("movies", [])
+        else:
+            logger.warning("movies-service returned status %s: %s", resp.status_code, resp.text)
+    except requests.RequestException as exc:
+        logger.warning("Failed to query movies-service with profile filters: %s", exc)
+
+    # Filter out watched movies and disliked genres, and prune to essential fields
+    candidates = filter_and_prune_candidates(movies, profile)
+    return candidates[:CANDIDATE_LIMIT]
+
+
 def build_prompt(profile: dict, candidates: list, user_message: str | None) -> str:
     """
     Generates the prompt (to send to AI model), based on:
@@ -123,22 +273,54 @@ def build_prompt(profile: dict, candidates: list, user_message: str | None) -> s
     - Movie candidates
     - Optionally, a custom user message
     """
+    # Ensure candidates in prompt are strictly pruned to essential fields and bounded <= 30
+    pruned_candidates = []
+    for m in (candidates or [])[:30]:
+        if isinstance(m, dict):
+            title_val = str(m.get("title") or "").strip()
+            if not title_val:
+                continue
+
+            y = m.get("year") if m.get("year") is not None else m.get("release_year")
+            try:
+                year_val = int(y) if y is not None else None
+            except (ValueError, TypeError):
+                year_val = None
+
+            raw_g = m.get("genres")
+            if isinstance(raw_g, str):
+                g_list = [g.strip() for g in raw_g.split(",") if g.strip()]
+            elif isinstance(raw_g, (list, tuple, set)):
+                g_list = [str(g).strip() for g in raw_g if str(g).strip()]
+            else:
+                g_list = []
+
+            pruned_candidates.append({
+                "title": title_val,
+                "year": year_val,
+                "genres": g_list,
+            })
+
     candidate_block = (
-        json.dumps(candidates, indent=2)
-        if candidates
+        json.dumps(pruned_candidates, indent=2)
+        if pruned_candidates
         else "(no catalog data available - use only well-known, real movies)"
     )
     extra_request = f'\nUser\'s specific request: "{user_message}"' if user_message else ""
 
     return f"""You are a movie recommendation engine. Given a user's profile and a
-pool of candidate movies, select and rank the best matches.
+pool of candidate movies, select and rank the best matches based on the user's preferences.
 
 User profile:
 {json.dumps(profile, indent=2)}
 
-Note: Do NOT recommend movies that the user has already watched.
+Rules:
+1. You MUST select movies from the candidate list below. Do NOT suggest movies outside this list.
+2. Prioritize movies whose genres directly match the user's favorite genres. Movies matching favorite genres must be ranked highest with the highest confidence.
+3. Do NOT recommend movies that the user has already watched.
+4. Set a realistic confidence score (between 0.1 and 1.0) reflecting how well each movie matches the profile.
 
-Candidate movies (prefer these; only go outside this list if none fit well):
+Candidate movies:
 {candidate_block}
 {extra_request}
 
@@ -157,7 +339,7 @@ no commentary before or after:
   ]
 }}
 
-Return between 3 and 8 recommendations."""
+Return up to 8 recommendations."""
 
 
 def call_llm(prompt: str) -> dict:
@@ -170,7 +352,7 @@ def call_llm(prompt: str) -> dict:
             "model": MODEL_NAME,
             "messages": [{"role": "user", "content": prompt}],
             "response_format": {"type": "json_object"},
-            "temperature": 0.7,
+            "temperature": 0.2,
             "think": False,
         },
         timeout=REQUEST_TIMEOUT,
@@ -225,10 +407,10 @@ def health():
 def generate():
     """
     Synchronous, user-facing endpoint.
-    Expects: { "candidates": [...], "message": "optional free text" }
+    Expects optional: { "message": "optional free text" }
+    (candidates in request body is optional; if omitted, fetched internally from movies-service)
     """
     body = request.get_json(silent=True) or {}
-    candidates = body.get("candidates")
     message = body.get("message")
 
     # Forward Authorization header to internal services
@@ -249,6 +431,14 @@ def generate():
     except requests.RequestException as exc:
         logger.error("Failed to fetch user profile: %s", exc)
         return jsonify({"error": "failed to fetch user profile"}), 502
+
+    # If client passed non-empty candidates (e.g. tests or external caller), use them after filtering/pruning;
+    # otherwise query movies-service internally
+    client_candidates = body.get("candidates")
+    if client_candidates and isinstance(client_candidates, list) and len(client_candidates) > 0:
+        candidates = filter_and_prune_candidates(client_candidates, profile)[:CANDIDATE_LIMIT]
+    else:
+        candidates = fetch_candidate_movies(profile, headers)
 
     try:
         result = generate_recommendations(profile, candidates, message)
