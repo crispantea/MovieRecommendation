@@ -1,4 +1,7 @@
 set dotenv-load := true
+# set dotenv-filename = [".env", ".env.secrets"] # TODO: This only works on newer justfile versions ...
+set export := true
+
 set shell       := ["bash", "-euo", "pipefail", "-c"]
 
 # --------------------------------------------------------------
@@ -23,17 +26,27 @@ compose      := "docker compose --env-file " + env_file + " --env-file " + secre
 # EXPORTED VARIABLES - needed across scripts
 # --------------------------------------------------------------
 
-export SERVICES_DIR := services_dir
-export SECRETS_FILE := secrets_file
+export SERVICES_DIR  := services_dir
+export SECRETS_FILE  := secrets_file
+export MANIFESTD_DIR := manifests_dir
+
+# ------------------------------------------------------------------------------------------------ #
+# Global
+# ------------------------------------------------------------------------------------------------ #
+
+# Initialize secrets and hydrate keycloak templates
+init:
+    bash {{scripts_dir}}/bootstrap.sh
+
+destroy:
+    rm -f {{secrets_file}} \
+          {{services_dir}}/authorization/import/realm-export.json \
+          {{manifests_dir}}/keycloak/base/realm-export.json
 
 # ------------------------------------------------------------------------------------------------ #
 # Local / Docker Compose Stack
 # ------------------------------------------------------------------------------------------------ #
 tf_auth_dir := tf_dir + "/auth"
-
-# Initialize secrets and hydrate keycloak templates
-local-init:
-    bash {{scripts_dir}}/bootstrap.sh
 
 # Start Keycloak container and wait until ready/healthy
 local-auth-service:
@@ -50,12 +63,11 @@ local-up: local-auth-service
     {{compose}} up -d --wait
 
 # Tear down all running containers
-local-down:
+local-clean:
     {{compose}} down
 
 # Full wipe (containers down + remove generated secrets)
-local-destroy: local-down
-    rm -f {{secrets_file}} {{services_dir}}/authorization/import/realm-export.json
+local-destroy: local-clean destroy
 
 # ------------------------------------------------------------------------------------------------ #
 # Local Kubernetes / Kind Stack
@@ -69,15 +81,24 @@ kind-load-images: kind-init
     kind load docker-image agi-frontend:latest --name cluster-psia2026
 
 kind-deploy: kind-load-images
-    # Ingress Controller
-    helm dependency build "{{manifests_dir}}/ingress-controller/base"
-    helm upgrade --install nginx-ingress "{{manifests_dir}}/ingress-controller/base" --namespace nginx-ingress --create-namespace --wait
+    # Apply the Gateway API CRDs
+    kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.1/standard-install.yaml
 
-    # Frontend
-    kubectl apply -k "{{manifests_dir}}/frontend/overlays/prod"
+    # Apply kgateway specific CRDs that will be used to define the type of proxy that will be created
+    helm upgrade -i kgateway-crds oci://cr.kgateway.dev/kgateway-dev/charts/kgateway-crds \
+    --create-namespace -n kgateway-system --version 2.4.5
 
-kind-destroy:
+    # Build and deploy the kgateway wrapper (already comes with the gateway definition)
+    helm dependency build "{{manifests_dir}}/kgateway/base"
+    helm upgrade -i kgateway "{{manifests_dir}}/kgateway/base" -n kgateway-system --create-namespace --wait
+
+    # Deploy Frontend
+    kubectl apply -k "{{manifests_dir}}/frontend/overlays/prod"  --wait
+
+kind-clean: 
     kind delete cluster --name={{cluster_name}}
+
+kind-destroy: kind-clean destroy
 
 # ------------------------------------------------------------------------------------------------ #
 # Cloud Kubernetes / Production Stack

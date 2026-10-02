@@ -5,6 +5,7 @@ set -euo pipefail
 REQUIRED_BOOTSTRAP_VARS=(
   "SECRETS_FILE"
   "SERVICES_DIR"
+  "MANIFESTD_DIR"
 )
 
 for v in "${REQUIRED_BOOTSTRAP_VARS[@]}"; do
@@ -37,8 +38,9 @@ done
 # Feed realm export template with generated secret if available
 if [ -f "$SERVICES_DIR/authorization/import/realm-export.json.template" ]; then
   sed "s|\${KEYCLOAK_TERRAFORM_SECRET}|$KEYCLOAK_TERRAFORM_SECRET|g" \
-    "$SERVICES_DIR/authorization/import/realm-export.json.template" > \
-    "$SERVICES_DIR/authorization/import/realm-export.json"
+  "$SERVICES_DIR/authorization/import/realm-export.json.template" | \
+  tee "$SERVICES_DIR/authorization/import/realm-export.json" \
+      "$MANIFESTD_DIR/keycloak/base/realm-export.json" > /dev/null
 fi
 
 echo "Bootstrap complete ($SECRETS_FILE updated and realm template rendered)"
