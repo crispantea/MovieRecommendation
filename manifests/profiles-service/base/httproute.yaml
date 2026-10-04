@@ -4,13 +4,19 @@ metadata:
   name: ${PROFILES_SERVICE_NAME}
 spec:
   parentRefs:
-  - name: default-gateway
-    namespace: kgateway-system
+    - name: default-gateway
+      namespace: kgateway-system
   rules:
-  - matches:
-    - path:
-        type: PathPrefix
-        value: /profiles
-    backendRefs:
-    - name: ${PROFILES_SERVICE_NAME}
-      port: ${PROFILES_CONTAINER_PORT}
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/profiles
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /profiles
+      backendRefs:
+        - name: ${PROFILES_SERVICE_NAME}
+          port: ${PROFILES_SERVICE_PORT}

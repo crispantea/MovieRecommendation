@@ -17,3 +17,6 @@ spec:
         - name: profiles-service
           image: agi-profiles-service
           imagePullPolicy: Never
+          envFrom:
+          - configMapRef:
+              name: ${PROFILES_SERVICE_NAME}

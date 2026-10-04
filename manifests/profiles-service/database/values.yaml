@@ -1,0 +1,8 @@
+postgresql:
+  fullnameOverride: profiles-service-database
+  global:
+    postgresql:
+      auth:
+        username: ${PROFILES_DB_USER}
+        password: ${PROFILES_DB_PASSWORD}
+        database: ${PROFILES_DB_NAME}

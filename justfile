@@ -94,7 +94,8 @@ local-destroy: local-clean destroy
 cluster_name := "cluster-psia2026"
 
 kind-init:
-    kind create cluster --config="{{manifests_dir}}/kind-cluster.yaml" --name={{cluster_name}}
+    # Create kind cluster (if doesnt exist)
+    kind get clusters | grep -qx "{{cluster_name}}" || kind create cluster --config="{{manifests_dir}}/kind-cluster.yaml" --name={{cluster_name}}
 
 kind-load-images: kind-init
     kind load docker-image agi-frontend:latest --name={{cluster_name}}
@@ -102,21 +103,32 @@ kind-load-images: kind-init
     kind load docker-image agi-inference-service:latest --name={{cluster_name}}
 
 kind-deploy: kind-load-images
+    # ---- Add required Helm repos and deploy Gateway API & kgateway CRDs ----
+    # Add bitnami repo
+    helm repo add bitnami https://charts.bitnami.com/bitnami
+    helm repo update
+
     # Apply the Gateway API CRDs
     kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.1/standard-install.yaml
 
     # Apply kgateway specific CRDs that will be used to define the type of proxy that will be created
     helm upgrade -i kgateway-crds oci://cr.kgateway.dev/kgateway-dev/charts/kgateway-crds \
-    --create-namespace -n kgateway-system --version 2.4.5
+    -n kgateway-system \
+    --create-namespace \
+    --version 2.4.5 \
+    --wait
+    # ------------------------------------------------------------------------
 
+    # -------------------------- Apply microservices -------------------------
     # Build and deploy the kgateway wrapper (already comes with the gateway definition)
     helm dependency build "{{manifests_dir}}/kgateway/base"
-    helm upgrade -i kgateway "{{manifests_dir}}/kgateway/base" -n kgateway-system --create-namespace --wait
+    helm upgrade -i kgateway "{{manifests_dir}}/kgateway/base" \
+    -n kgateway-system \
+    --create-namespace \
+    --wait
 
-    # Build the keyclaok wrapper (already comes with the httproute, secrets and configmap used on keycloak)
+    # Build and deploy the keyclaok wrapper (already comes with the httproute, secrets and configmap used on keycloak)
     helm dependency build "{{manifests_dir}}/keycloak/base"
-
-    # Deploy the keycloak wrapper
     set -a; source {{secrets_env_file}}; set +a && \
     envsubst < "{{manifests_dir}}/keycloak/base/values.yaml" | \
     helm upgrade --install keycloak "{{manifests_dir}}/keycloak/base" \
@@ -131,11 +143,43 @@ kind-deploy: kind-load-images
     terraform -chdir={{tf_dev_auth_dir}} init -input=false && \
     terraform -chdir={{tf_dev_auth_dir}} apply -auto-approve
 
-    # Deploy Frontend
-    kubectl kustomize "{{manifests_dir}}/frontend/overlays/prod" | envsubst | kubectl apply -f - --wait
+    # Build and deploy the profiles-service wrapper
+    helm dependency build "{{manifests_dir}}/profiles-service/database"
+    set -a; source {{secrets_env_file}}; set +a && \
+    envsubst < "{{manifests_dir}}/profiles-service/database/values.yaml" | \
+    helm upgrade --install postgresql "{{manifests_dir}}/profiles-service/database" \
+    -n profiles-service \
+    --create-namespace \
+    --wait \
+    -f -
+
+    set -a; source {{secrets_env_file}}; set +a && \
+    kubectl kustomize "{{manifests_dir}}/profiles-service/overlays/prod" | envsubst | kubectl apply -f - --wait
 
     # Deploy Inference Service
     kubectl kustomize --load-restrictor LoadRestrictionsNone "manifests/inference-service/overlays/prod" | envsubst | kubectl apply -f - --wait
+    
+    # Deploy Frontend
+    kubectl kustomize "{{manifests_dir}}/frontend/overlays/prod" | envsubst | kubectl apply -f - --wait
+
+
+kind-deploy-profiles-service:
+    # Build and deploy the profiles-service wrapper
+    helm dependency build "{{manifests_dir}}/profiles-service/database"
+    set -a; source {{secrets_env_file}}; set +a && \
+    envsubst < "{{manifests_dir}}/profiles-service/database/values.yaml" | \
+    helm upgrade --install postgresql "{{manifests_dir}}/profiles-service/database" \
+    -n profiles-service \
+    --create-namespace \
+    --wait \
+    -f -
+    
+    set -a; source {{secrets_env_file}}; set +a && \
+    kubectl kustomize "{{manifests_dir}}/profiles-service/overlays/prod" | envsubst | kubectl apply -f - --wait
+
+kind-clean-profiles-service:
+    helm uninstall postgresql
+    kubectl kustomize "{{manifests_dir}}/profiles-service/overlays/prod" | envsubst | kubectl delete -f - --wait
 
 kind-deploy-inference-service:
     kubectl kustomize --load-restrictor LoadRestrictionsNone "manifests/inference-service/overlays/prod" | envsubst
