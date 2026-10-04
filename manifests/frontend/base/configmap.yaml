@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: frontend-config
+  name: ${FRONTEND_SERVICE_NAME}
 data:
   KEYCLOAK_URL: "http://${APP_DOMAIN}:${APP_HOST_PORT}${KEYCLOAK_PATH}"
   KEYCLOAK_APP_REALM: ${KEYCLOAK_APP_REALM}

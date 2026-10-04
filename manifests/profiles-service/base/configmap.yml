@@ -3,8 +3,10 @@ kind: ConfigMap
 metadata:
   name: profiles-service-config
 data:
-  PORT: "${PROFILES_PORT}"
-  DATABASE_URL: postgresql://${PROFILES_DB_USER}:${PROFILES_DB_PASSWORD}@profiles-service-database:5432/${PROFILES_DB_NAME}
-  KEYCLOAK_ISSUER: http://localhost:8080/realms/${KEYCLOAK_APP_REALM} # TODO: Why localhost???
-  KEYCLOAK_JWKS_URL: http://auth-service:8080/realms/${KEYCLOAK_APP_REALM}/protocol/openid-connect/certs
+  # TODO: Find a workaround to use "${PROFILES_CONTAINER_PORT}", it doesnt work here because of how
+  # envsubst acts on the var, it substitues de values but parses the PORT to a number instead of a string
+  PORT: "3000"
+  DATABASE_URL: "postgresql://${PROFILES_DB_USER}:${PROFILES_DB_PASSWORD}@profiles-service-database:5432/${PROFILES_DB_NAME}"
+  KEYCLOAK_ISSUER: "${KEYCLOAK_SERVICE_NAME}.${KEYCLOAK_NAMESPACE}.svc:${KEYCLOAK_SERVICE_PORT}${KEYCLOAK_PATH}/realms/${KEYCLOAK_APP_REALM}"
+  KEYCLOAK_JWKS_URL: "${KEYCLOAK_SERVICE_NAME}.${KEYCLOAK_NAMESPACE}.svc:${KEYCLOAK_SERVICE_PORT}${KEYCLOAK_PATH}/realms/${KEYCLOAK_APP_REALM}/protocol/openid-connect/certs"
   AUDIENCE: ${PROFILES_AUDIENCE}
