@@ -97,8 +97,9 @@ kind-init:
     kind create cluster --config="{{manifests_dir}}/kind-cluster.yaml" --name={{cluster_name}}
 
 kind-load-images: kind-init
-    kind load docker-image agi-frontend:latest --name cluster-psia2026
-    kind load docker-image agi-profiles-service:latest --name cluster-psia2026
+    kind load docker-image agi-frontend:latest --name={{cluster_name}}
+    kind load docker-image agi-profiles-service:latest --name={{cluster_name}}
+    kind load docker-image agi-inference-service:latest --name={{cluster_name}}
 
 kind-deploy: kind-load-images
     # Apply the Gateway API CRDs
@@ -132,6 +133,21 @@ kind-deploy: kind-load-images
 
     # Deploy Frontend
     kubectl kustomize "{{manifests_dir}}/frontend/overlays/prod" | envsubst | kubectl apply -f - --wait
+
+    # Deploy Inference Service
+    kubectl kustomize --load-restrictor LoadRestrictionsNone "manifests/inference-service/overlays/prod" | envsubst | kubectl apply -f - --wait
+
+kind-deploy-inference-service:
+    kubectl kustomize --load-restrictor LoadRestrictionsNone "manifests/inference-service/overlays/prod" | envsubst
+
+kind-clean-inference-service:
+    kubectl kustomize --load-restrictor LoadRestrictionsNone "manifests/inference-service/overlays/prod" |  envsubst | kubectl delete -f - --wait
+
+kind-deploy-frontend:
+    kubectl kustomize "{{manifests_dir}}/frontend/overlays/prod" | envsubst | kubectl apply -f - --wait
+
+kind-clean-frontend:
+    kubectl kustomize "{{manifests_dir}}/frontend/overlays/prod" | envsubst | kubectl delete -f - --wait
 
 kind-clean: 
     kind delete cluster --name={{cluster_name}}

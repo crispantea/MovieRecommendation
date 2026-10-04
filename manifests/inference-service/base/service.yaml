@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${INFERENCE_SERVICE_NAME}
+spec:
+  selector:
+    app.kubernetes.io/name: ${INFERENCE_SERVICE_NAME}
+  ports:
+    - port: ${INFERENCE_SERVICE_PORT}
+      targetPort: ${INFERENCE_CONTAINER_PORT}

@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${INFERENCE_SERVICE_NAME}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ${INFERENCE_SERVICE_NAME}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ${INFERENCE_SERVICE_NAME}
+    spec:
+      containers:
+        - name: inference-service
+          image: agi-inference-service
+          imagePullPolicy: Never
+          ports:
+            - containerPort: "${INFERENCE_CONTAINER_PORT}"
+          envFrom:
+            - configMapRef:
+                name: ${INFERENCE_SERVICE_NAME}
+
+        - name: inference-service-ollama
+          image: ollama/ollama:0.34.1
+          command: ["/bin/sh", "/scripts/ollama-init.sh"]
+          ports:
+            - name: ollama
+              containerPort: 11434
+          volumeMounts:
+            - name: ollama-init
+              mountPath: /scripts
+              readOnly: true
+            - name: ollama-data
+              mountPath: /root/.ollama
+          startupProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - ollama list | awk '{print $1}' | grep -qx 'llama3.2:1b'
+            periodSeconds: 30
+            timeoutSeconds: 3
+            failureThreshold: 60
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - ollama list | awk '{print $1}' | grep -qx 'llama3.2:1b'
+            periodSeconds: 30
+            timeoutSeconds: 3
+
+      volumes:
+        - name: ollama-init
+          configMap:
+            name: ollama-init
+        - name: ollama-data
+          emptyDir: {}
