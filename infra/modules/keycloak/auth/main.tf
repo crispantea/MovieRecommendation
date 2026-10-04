@@ -61,8 +61,8 @@ resource "keycloak_openid_client" "agi_web" {
   pkce_code_challenge_method   = "S256"
 
   root_url                        = var.frontend_url
-  valid_redirect_uris             = ["${var.frontend_url}/*"]
-  valid_post_logout_redirect_uris = ["${var.frontend_url}/*"]
+  valid_redirect_uris             = ["${var.frontend_url}/*", "${var.frontend_url}"]
+  valid_post_logout_redirect_uris = ["${var.frontend_url}/*", "${var.frontend_url}"]
   web_origins                     = [var.frontend_url]
 
   # Only roles explicitly mapped below will appear in this client's tokens

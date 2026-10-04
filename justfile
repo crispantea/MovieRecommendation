@@ -38,6 +38,9 @@ export MANIFESTD_DIR := manifests_dir
 init:
     bash {{scripts_dir}}/bootstrap.sh
 
+build:
+    {{compose}} build --no-cache
+
 destroy:
     rm -f {{secrets_env_file}} \
           {{services_dir}}/authorization/import/realm-export.json \
@@ -60,9 +63,6 @@ local-init-keycloak:
     . {{scripts_dir}}/terraform/keycloak/export-input-vars.sh && \
     terraform -chdir={{tf_dev_auth_dir}} init -input=false && \
     terraform -chdir={{tf_dev_auth_dir}} apply -auto-approve
-
-local-build:
-    {{compose}} build --no-cache
 
 # Full stack startup
 local-up: local-init-keycloak
@@ -131,7 +131,7 @@ kind-deploy: kind-load-images
     terraform -chdir={{tf_dev_auth_dir}} apply -auto-approve
 
     # Deploy Frontend
-    kubectl apply -k "{{manifests_dir}}/frontend/overlays/prod"  --wait
+    kubectl kustomize "{{manifests_dir}}/frontend/overlays/prod" | envsubst | kubectl apply -f - --wait
 
 kind-clean: 
     kind delete cluster --name={{cluster_name}}

@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+cat <<EOF > /usr/share/nginx/html/config.js
+window.__ENV__ = {
+  KEYCLOAK_URL: "${KEYCLOAK_URL:-}",
+  KEYCLOAK_APP_REALM: "${KEYCLOAK_APP_REALM:-}",
+  KEYCLOAK_APP_CLIENT_ID: "${KEYCLOAK_APP_CLIENT_ID:-}",
+  PROFILES_SERVICE_URL: "${PROFILES_SERVICE_URL:-}",
+  INFERENCE_SERVICE_URL: "${INFERENCE_SERVICE_URL:-}"
+};
+EOF
