@@ -1,37 +1,37 @@
-set dotenv-load := true
-# set dotenv-filename = [".env", ".env.secrets"] # TODO: This only works on newer justfile versions ...
-set export := true
-
-set shell       := ["bash", "-euo", "pipefail", "-c"]
+set dotenv-load
+set shell := ["bash", "-euo", "pipefail", "-c", ': "${ENV?ENV is required, e.g. ENV=local just up}"; set -a; for e in $ENV; do . ".env.$e"; done; eval "$0"']
 
 # --------------------------------------------------------------
-# VARIABLES
+# Variables
 # --------------------------------------------------------------
 
 # Env Files
-secrets_file := ".env.secrets"
-env_file     := ".env"
+global_env_file  := ".env"
+local_env_file   := ".env.local"
+kind_env_file    := ".env.kind"
+cloud_env_file   := ".env.cloud"
+secrets_env_file := ".env.secrets"
 
 # Directories
 services_dir := "services"
 scripts_dir  := "scripts"
-tf_dir       := "infra/environments/dev"
+tf_dir       := "infra"
 ansible_dir  := "ansible"
 manifests_dir := "manifests"
 
-# This uses the variables defined in the env files provided and fills the required vars in the docker compose file
-compose      := "docker compose --env-file " + env_file + " --env-file " + secrets_file + " -f " + services_dir + "/docker-compose.yml"
+tf_dev_dir := tf_dir + "/environments/dev"
+tf_dev_auth_dir := tf_dev_dir + "/auth"
 
 # --------------------------------------------------------------
-# EXPORTED VARIABLES - needed across scripts
+# Exported Variables - needed across scripts
 # --------------------------------------------------------------
 
 export SERVICES_DIR  := services_dir
-export SECRETS_FILE  := secrets_file
+export SECRETS_FILE  := secrets_env_file
 export MANIFESTD_DIR := manifests_dir
 
 # ------------------------------------------------------------------------------------------------ #
-# Global
+# Global targets - used across scripts
 # ------------------------------------------------------------------------------------------------ #
 
 # Initialize secrets and hydrate keycloak templates
@@ -39,27 +39,33 @@ init:
     bash {{scripts_dir}}/bootstrap.sh
 
 destroy:
-    rm -f {{secrets_file}} \
+    rm -f {{secrets_env_file}} \
           {{services_dir}}/authorization/import/realm-export.json \
           {{manifests_dir}}/keycloak/base/realm-export.json
 
 # ------------------------------------------------------------------------------------------------ #
 # Local / Docker Compose Stack
 # ------------------------------------------------------------------------------------------------ #
-tf_auth_dir := tf_dir + "/auth"
 
-# Start Keycloak container and wait until ready/healthy
-local-auth-service:
+# This uses the variables defined in the env files provided and fills the required vars in the docker compose file
+compose := "docker compose --env-file " + global_env_file + \
+                         " --env-file " + local_env_file + \
+                         " --env-file " + secrets_env_file + \
+                         " -f " + services_dir + "/docker-compose.yml"
+
+# Initialize Keycloak container and create required resources using terraform
+local-init-keycloak:
     {{compose}} up -d --wait auth-service
-    . {{scripts_dir}}/terraform/keycloak/load-env.sh && \
-    terraform -chdir={{tf_auth_dir}} init -input=false && \
-    terraform -chdir={{tf_auth_dir}} apply -auto-approve
+    set -a; source {{secrets_env_file}}; set +a && \
+    . {{scripts_dir}}/terraform/keycloak/export-input-vars.sh && \
+    terraform -chdir={{tf_dev_auth_dir}} init -input=false && \
+    terraform -chdir={{tf_dev_auth_dir}} apply -auto-approve
 
 local-build:
     {{compose}} build --no-cache
 
 # Full stack startup
-local-up: local-auth-service
+local-up: local-init-keycloak
     {{compose}} up -d --wait
 
 # Manually trigger movie dataset seeding (respects USE_TEMPLATE_DB or falls back)
@@ -106,22 +112,26 @@ kind-deploy: kind-load-images
     helm dependency build "{{manifests_dir}}/kgateway/base"
     helm upgrade -i kgateway "{{manifests_dir}}/kgateway/base" -n kgateway-system --create-namespace --wait
 
-    # Deploy Frontend
-    kubectl apply -k "{{manifests_dir}}/frontend/overlays/prod"  --wait
-
-    # Build and deploy keyclaok wrapper (already comes with the httproute, secrets and configmap used on keycloak)
+    # Build the keyclaok wrapper (already comes with the httproute, secrets and configmap used on keycloak)
     helm dependency build "{{manifests_dir}}/keycloak/base"
 
-    # Ugly workaround because apt justfile version is very old and therefore this:
-    # set dotenv-filename = [".env", ".env.secrets"]  doesnt work in the current version, we can update it, but it
-    # requires everyone to update it using binary installation
-    set -a; [ -f {{env_file}} ] && . ./{{env_file}}; [ -f {{secrets_file}} ] && . ./{{secrets_file}}; set +a; \
+    # Deploy the keycloak wrapper
+    set -a; source {{secrets_env_file}}; set +a && \
     envsubst < "{{manifests_dir}}/keycloak/base/values.yaml" | \
     helm upgrade --install keycloak "{{manifests_dir}}/keycloak/base" \
     -n keycloak \
     --create-namespace \
     --wait \
     -f -
+
+    # Initialize keycloak resources using terraform
+    set -a; source {{secrets_env_file}}; set +a && \
+    . {{scripts_dir}}/terraform/keycloak/export-input-vars.sh && \
+    terraform -chdir={{tf_dev_auth_dir}} init -input=false && \
+    terraform -chdir={{tf_dev_auth_dir}} apply -auto-approve
+
+    # Deploy Frontend
+    kubectl apply -k "{{manifests_dir}}/frontend/overlays/prod"  --wait
 
 kind-clean: 
     kind delete cluster --name={{cluster_name}}
