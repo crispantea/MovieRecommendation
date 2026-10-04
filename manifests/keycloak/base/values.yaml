@@ -1,0 +1,46 @@
+global:
+  imageRegistry: docker.io
+  security:
+    # needed to override the image repository used (needs to be the bitnamilegacy)
+    allowInsecureImages: true 
+
+# Wrapper chart custom secrets
+globalSecrets:
+  # Values that will be used to build the secrets and configmap that will be
+  # used by the wrapped helm chart
+  auth:
+    secretName: "keycloak-auth-credentials"
+    configName: "keycloak-config"
+    adminPassword: ${KEYCLOAK_ADMIN_PASSWORD}
+  db:
+    secretName: "keycloak-db-credentials"
+    postgresPassword: ${AUTH_DB_PASSWORD}
+
+# Keycloak and PostgreSQL subchart configuration
+keycloak:
+  httpRelativePath: "/auth/"
+  image:
+    repository: bitnamilegacy/keycloak
+  
+  keycloakConfigCli:
+    enabled: true
+    existingConfigmap: "keycloak-config"
+    image:
+      repository: bitnamilegacy/keycloak-config-cli
+
+  auth:
+    adminUser: ${KEYCLOAK_ADMIN_USER}
+    existingSecret: "keycloak-auth-credentials"
+    passwordSecretKey: "admin-password"
+
+  postgresql:
+    enabled: true
+    image:
+      repository: bitnamilegacy/postgresql
+
+    auth:
+      username: ${AUTH_DB_USER}
+      database: ${AUTH_DB_NAME}
+      existingSecret: "keycloak-db-credentials"
+      secretKeys:
+        userPasswordKey: "postgres-password"
