@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: profiles-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: profiles-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: profiles-service
+
+    spec:
+      containers:
+        - name: profiles-service
+          image: agi-profiles-service
+          imagePullPolicy: Never

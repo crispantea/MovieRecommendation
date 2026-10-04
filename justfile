@@ -92,6 +92,7 @@ kind-init:
 
 kind-load-images: kind-init
     kind load docker-image agi-frontend:latest --name cluster-psia2026
+    kind load docker-image agi-profiles-service:latest --name cluster-psia2026
 
 kind-deploy: kind-load-images
     # Apply the Gateway API CRDs

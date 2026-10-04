@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: profiles-service-config
+data:
+  PORT: "${PROFILES_PORT}"
+  DATABASE_URL: postgresql://${PROFILES_DB_USER}:${PROFILES_DB_PASSWORD}@profiles-service-database:5432/${PROFILES_DB_NAME}
+  KEYCLOAK_ISSUER: http://localhost:8080/realms/${KEYCLOAK_APP_REALM} # TODO: Why localhost???
+  KEYCLOAK_JWKS_URL: http://auth-service:8080/realms/${KEYCLOAK_APP_REALM}/protocol/openid-connect/certs
+  AUDIENCE: ${PROFILES_AUDIENCE}
