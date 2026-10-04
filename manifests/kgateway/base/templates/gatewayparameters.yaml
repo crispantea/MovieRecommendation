@@ -1,0 +1,12 @@
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: GatewayParameters
+metadata:
+  name: default-gateway-params
+  namespace: kgateway-system
+spec:
+  kube:
+    service:
+      type: NodePort
+      ports:
+      - port: 80
+        nodePort: 30080

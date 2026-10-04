@@ -5,5 +5,4 @@ resources:
   - namespace.yaml
   - deployment.yaml
   - service.yaml
-  - netpolicy.yaml
-  - ingress.yaml
+  - httproute.yaml
