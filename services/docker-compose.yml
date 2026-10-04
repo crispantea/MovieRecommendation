@@ -73,17 +73,17 @@ services:
       context: ./inference-service
     container_name: inference-service
     environment:
-      PORT: ${INFERENCE_PORT}
-      PROFILES_SERVICE_URL: http://profiles-service:${PROFILES_PORT}
-      MOVIES_SERVICE_URL: http://movies-service:${MOVIES_PORT}
+      PORT: ${INFERENCE_CONTAINER_PORT}
+      PROFILES_SERVICE_URL: http://profiles-service:${PROFILES_CONTAINER_PORT}
+      MOVIES_SERVICE_URL: http://movies-service:${MOVIES_CONTAINER_PORT}
       MODEL_SERVER_URL: http://inference-service-ollama:11434
       KEYCLOAK_ISSUER: http://localhost:8080/realms/${KEYCLOAK_APP_REALM} # TODO: Why localhost???
       KEYCLOAK_JWKS_URL: http://auth-service:8080/realms/${KEYCLOAK_APP_REALM}/protocol/openid-connect/certs
       AUDIENCE: ${INFERENCE_AUDIENCE}
     ports:
-      - "${INFERENCE_HOST_PORT}:${INFERENCE_PORT}"
+      - "${INFERENCE_HOST_PORT}:${INFERENCE_CONTAINER_PORT}"
     healthcheck:
-      test: ["CMD-SHELL", "curl http://localhost:${INFERENCE_PORT}/health"]
+      test: ["CMD-SHELL", "curl http://localhost:${INFERENCE_CONTAINER_PORT}/health"]
       interval: 2s
       timeout: 1s
       retries: 5
@@ -126,15 +126,15 @@ services:
       context: ./profiles-service
     container_name: profiles-service
     environment:
-      PORT: ${PROFILES_PORT}
+      PORT: ${PROFILES_CONTAINER_PORT}
       DATABASE_URL: postgresql://${PROFILES_DB_USER}:${PROFILES_DB_PASSWORD}@profiles-service-database:5432/${PROFILES_DB_NAME}
       KEYCLOAK_ISSUER: http://localhost:8080/realms/${KEYCLOAK_APP_REALM} # TODO: Why localhost???
       KEYCLOAK_JWKS_URL: http://auth-service:8080/realms/${KEYCLOAK_APP_REALM}/protocol/openid-connect/certs
       AUDIENCE: ${PROFILES_AUDIENCE}
     ports:
-      - "${PROFILES_HOST_PORT}:${PROFILES_PORT}"
+      - "${PROFILES_HOST_PORT}:${PROFILES_CONTAINER_PORT}"
     healthcheck:
-      test: ["CMD-SHELL", "curl http://localhost:${PROFILES_PORT}/health"]
+      test: ["CMD-SHELL", "curl http://localhost:${PROFILES_CONTAINER_PORT}/health"]
       interval: 2s
       timeout: 1s
       retries: 5
@@ -173,7 +173,7 @@ services:
       context: ./movies-service
     container_name: movies-service
     environment:
-      PORT: ${MOVIES_PORT}
+      PORT: ${MOVIES_CONTAINER_PORT}
       DATABASE_URL: postgresql://${MOVIES_DB_USER}:${MOVIES_DB_PASSWORD}@movies-service-database:5432/${MOVIES_DB_NAME}
       KEYCLOAK_ISSUER: http://localhost:${KEYCLOAK_HOST_PORT}/realms/${KEYCLOAK_APP_REALM}
       KEYCLOAK_JWKS_URL: http://auth-service:8080/realms/${KEYCLOAK_APP_REALM}/protocol/openid-connect/certs
@@ -181,11 +181,11 @@ services:
       USE_TEMPLATE_DB: ${USE_TEMPLATE_DB:-true}
       DISABLE_AUTH: ${DISABLE_AUTH:-false}
     ports:
-      - "${MOVIES_HOST_PORT}:${MOVIES_PORT}"
+      - "${MOVIES_HOST_PORT}:${MOVIES_CONTAINER_PORT}"
     volumes:
       - ./movies-service/data:/app/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:${MOVIES_PORT}/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:${MOVIES_CONTAINER_PORT}/health || exit 1"]
       interval: 2s
       timeout: 1s
       retries: 5
@@ -225,14 +225,14 @@ services:
     build:
       context: ./frontend
     environment:
-      PORT: ${FRONTEND_PORT}
-      PROFILES_SERVICE_URL: http://profiles-service:${PROFILES_PORT}
-      INFERENCE_SERVICE_URL: http://inference-service:${INFERENCE_PORT}
+      PORT: ${FRONTEND_CONTAINER_PORT}
+      PROFILES_SERVICE_URL: http://profiles-service:${PROFILES_CONTAINER_PORT}
+      INFERENCE_SERVICE_URL: http://inference-service:${INFERENCE_CONTAINER_PORT}
       KEYCLOAK_URL: http://localhost:${KEYCLOAK_HOST_PORT}
       KEYCLOAK_APP_REALM: ${KEYCLOAK_APP_REALM}
       KEYCLOAK_APP_CLIENT_ID: ${KEYCLOAK_APP_CLIENT_ID}
     ports:
-      - "${FRONTEND_HOST_PORT}:${FRONTEND_PORT}"
+      - "${FRONTEND_HOST_PORT}:${FRONTEND_CONTAINER_PORT}"
     depends_on:
       profiles-service:
         condition: service_healthy
