@@ -1,16 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: frontend
+  name: ${FRONTEND_SERVICE_NAME}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: frontend
+      app.kubernetes.io/name: ${FRONTEND_SERVICE_NAME}
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: frontend
+        app.kubernetes.io/name: ${FRONTEND_SERVICE_NAME}
 
     spec:
       containers:
@@ -18,7 +18,7 @@ spec:
           image: agi-frontend
           imagePullPolicy: Never
           ports:
-            - containerPort: 80
+            - containerPort: ${FRONTEND_SERVICE_PORT}
           envFrom:
             - configMapRef:
-                name: frontend-config
+                name: ${FRONTEND_SERVICE_NAME}

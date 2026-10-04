@@ -18,6 +18,8 @@ globalSecrets:
 
 # Keycloak and PostgreSQL subchart configuration
 keycloak:
+  global:
+    fullnameOverride: ${KEYCLOAK_SERVICE_NAME}
   httpRelativePath: "/auth/"
   image:
     repository: bitnamilegacy/keycloak

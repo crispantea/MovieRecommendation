@@ -1,12 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: frontend
+namespace: ${FRONTEND_NAMESPACE}
 
 # Useful for `kubectl get all -l app.kubernetes.io/name=frontend` style lookups.
 labels:
   - pairs:
-      app.kubernetes.io/name: frontend
+      app.kubernetes.io/name: ${FRONTEND_SERVICE_NAME}
 
 resources:
   - ../../base

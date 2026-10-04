@@ -1,16 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: profiles-service
+  name: ${PROFILES_SERVICE_NAME}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: profiles-service
+      app.kubernetes.io/name: ${PROFILES_SERVICE_NAME}
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: profiles-service
+        app.kubernetes.io/name: ${PROFILES_SERVICE_NAME}
 
     spec:
       containers:
