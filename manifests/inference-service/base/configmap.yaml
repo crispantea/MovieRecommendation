@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "${INFERENCE_SERVICE_NAME}"
+data:
+  # TODO: Find a workaround to use "${INFERENCE_CONTAINER_PORT}", it doesnt work here because of how
+  # envsubst acts on the var, it substitues de values but parses the PORT to a number instead of a string
+  PORT: "8000"
+  PROFILES_SERVICE_URL: "${PROFILES_SERVICE_NAME}.${PROFILES_NAMESPACE}.svc:${PROFILES_SERVICE_PORT}"
+  MOVIES_SERVICE_URL: "${MOVIES_SERVICE_NAME}.${MOVIES_NAMESPACE}.svc:${MOVIES_SERVICE_PORT}"
+  MODEL_SERVER_URL: "http://localhost:11434" # container is running on the same pod
+  KEYCLOAK_ISSUER: "${KEYCLOAK_SERVICE_NAME}.${KEYCLOAK_NAMESPACE}.svc:${KEYCLOAK_SERVICE_PORT}${KEYCLOAK_PATH}/realms/${KEYCLOAK_APP_REALM}"
+  KEYCLOAK_JWKS_URL: "${KEYCLOAK_SERVICE_NAME}.${KEYCLOAK_NAMESPACE}.svc:${KEYCLOAK_SERVICE_PORT}${KEYCLOAK_PATH}/realms/${KEYCLOAK_APP_REALM}/protocol/openid-connect/certs"
+  AUDIENCE: "${INFERENCE_AUDIENCE}"
