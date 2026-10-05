@@ -17,44 +17,7 @@ spec:
           image: ${INFERENCE_SERVICE_IMAGE}
           imagePullPolicy: Never
           ports:
-            - containerPort: "${INFERENCE_CONTAINER_PORT}"
+            - containerPort: "${INFERENCE_SERVICE_PORT}"
           envFrom:
             - configMapRef:
                 name: ${INFERENCE_SERVICE_NAME}
-
-        - name: inference-service-ollama
-          image: ${INFERENCE_OLLAMA_IMAGE}
-          command: ["/bin/sh", "/scripts/ollama-init.sh"]
-          ports:
-            - name: ollama
-              containerPort: 11434
-          volumeMounts:
-            - name: ollama-init
-              mountPath: /scripts
-              readOnly: true
-            - name: ollama-data
-              mountPath: /root/.ollama
-          startupProbe:
-            exec:
-              command:
-                - /bin/sh
-                - -c
-                - ollama list | awk '{print $1}' | grep -qx 'llama3.2:1b'
-            periodSeconds: 30
-            timeoutSeconds: 3
-            failureThreshold: 60
-          readinessProbe:
-            exec:
-              command:
-                - /bin/sh
-                - -c
-                - ollama list | awk '{print $1}' | grep -qx 'llama3.2:1b'
-            periodSeconds: 30
-            timeoutSeconds: 3
-
-      volumes:
-        - name: ollama-init
-          configMap:
-            name: ollama-init
-        - name: ollama-data
-          emptyDir: {}

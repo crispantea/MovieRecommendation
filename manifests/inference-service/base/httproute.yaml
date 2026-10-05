@@ -11,13 +11,12 @@ spec:
     - path:
         type: PathPrefix
         value: ${INFERENCE_PATH}
-    # TODO:
-    # filters:
-    #   - type: URLRewrite
-    #     urlRewrite:
-    #       path:
-    #         type: ReplacePrefixMatch
-    #         replacePrefixMatch: /
+    filters:
+      - type: URLRewrite
+        urlRewrite:
+          path:
+            type: ReplacePrefixMatch
+            replacePrefixMatch: /
     backendRefs:
     - name: ${INFERENCE_SERVICE_NAME}
       port: ${INFERENCE_SERVICE_PORT}

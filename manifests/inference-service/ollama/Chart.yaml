@@ -1,0 +1,10 @@
+apiVersion: v2
+name: inference-ollama-wrapper
+description: Ollama for inference-service
+type: application
+version: 0.1.0
+appVersion: "1.85"
+dependencies:
+  - name: ollama
+    version: "1.85.0"
+    repository: https://helm.otwld.com/

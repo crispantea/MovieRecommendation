@@ -40,6 +40,7 @@ init:
 
 build:
     {{compose}} build --no-cache
+    docker image pull ${INFERENCE_OLLAMA_IMAGE_REPO}:${INFERENCE_OLLAMA_IMAGE_TAG}
 
 destroy:
     rm -f {{secrets_env_file}} \
@@ -97,15 +98,10 @@ kind-init:
     # Create kind cluster (if doesnt exist)
     kind get clusters | grep -qx "{{cluster_name}}" || kind create cluster --config="{{manifests_dir}}/kind-cluster.yaml" --name={{cluster_name}}
 
-kind-load-images: kind-init
-    kind load docker-image ${FRONTEND_IMAGE}:latest --name={{cluster_name}}
-    kind load docker-image ${PROFILES_SERVICE_IMAGE}:latest --name={{cluster_name}}
-    kind load docker-image ${INFERENCE_SERVICE_IMAGE}:latest --name={{cluster_name}}
-
-kind-deploy: kind-load-images
     # ---- Add required Helm repos and deploy Gateway API & kgateway CRDs ----
     # Add bitnami repo
     helm repo add bitnami https://charts.bitnami.com/bitnami
+    helm repo add otwld https://helm.otwld.com/
     helm repo update
 
     # Apply the Gateway API CRDs
@@ -117,9 +113,9 @@ kind-deploy: kind-load-images
     --create-namespace \
     --version 2.4.5 \
     --wait
-    # ------------------------------------------------------------------------
 
-    # -------------------------- Apply microservices -------------------------
+
+kind-deploy-kgateway:
     # Build and deploy the kgateway wrapper (already comes with the gateway definition)
     helm dependency build "{{manifests_dir}}/kgateway/base"
     helm upgrade -i kgateway "{{manifests_dir}}/kgateway/base" \
@@ -127,6 +123,7 @@ kind-deploy: kind-load-images
     --create-namespace \
     --wait
 
+kind-deploy-keycloak:
     # Build and deploy the keyclaok wrapper (already comes with the httproute, secrets and configmap used on keycloak)
     helm dependency build "{{manifests_dir}}/keycloak/base"
     set -a; source {{secrets_env_file}}; set +a && \
@@ -143,6 +140,9 @@ kind-deploy: kind-load-images
     terraform -chdir={{tf_dev_auth_dir}} init -input=false && \
     terraform -chdir={{tf_dev_auth_dir}} apply -auto-approve
 
+kind-deploy-profiles-service:
+    kind load docker-image ${PROFILES_SERVICE_IMAGE}:latest --name={{cluster_name}}
+
     # Build and deploy the profiles-service wrapper
     helm dependency build "{{manifests_dir}}/profiles-service/database"
     set -a; source {{secrets_env_file}}; set +a && \
@@ -152,48 +152,52 @@ kind-deploy: kind-load-images
     --create-namespace \
     --wait \
     -f -
-
+    
     set -a; source {{secrets_env_file}}; set +a && \
     kubectl kustomize "{{manifests_dir}}/profiles-service/overlays/prod" | envsubst | kubectl apply -f - --wait
 
-    # Deploy Inference Service
-    kubectl kustomize --load-restrictor LoadRestrictionsNone "manifests/inference-service/overlays/prod" | envsubst | kubectl apply -f - --wait
-    
-    # Deploy Frontend
+kind-deploy-inference-service:
+    kind load docker-image ${INFERENCE_OLLAMA_IMAGE_REPO}:${INFERENCE_OLLAMA_IMAGE_TAG} --name={{cluster_name}}
+
+    # Build and deploy the ollama wrapper
+    helm dependency build "{{manifests_dir}}/inference-service/ollama"
+
+    envsubst < "{{manifests_dir}}/inference-service/ollama/values.yaml" | \
+    helm upgrade --install ollama "{{manifests_dir}}/inference-service/ollama" \
+    -n ${INFERENCE_NAMESPACE} \
+    --create-namespace \
+    --wait --timeout 20m \
+    -f -
+
+    kind load docker-image ${INFERENCE_SERVICE_IMAGE}:latest --name={{cluster_name}}
+    kubectl kustomize "{{manifests_dir}}/inference-service/overlays/prod" | envsubst | kubectl apply -f - --wait
+
+kind-deploy-frontend:
+    kind load docker-image ${FRONTEND_IMAGE}:latest --name={{cluster_name}}
     kubectl kustomize "{{manifests_dir}}/frontend/overlays/prod" | envsubst | kubectl apply -f - --wait
 
+kind-deploy: kind-init kind-deploy-kgateway kind-deploy-keycloak kind-deploy-profiles-service kind-deploy-inference-service kind-deploy-frontend
 
-kind-deploy-profiles-service:
-    # Build and deploy the profiles-service wrapper
-    helm dependency build "{{manifests_dir}}/profiles-service/database"
-    set -a; source {{secrets_env_file}}; set +a && \
-    envsubst < "{{manifests_dir}}/profiles-service/database/values.yaml" | \
-    helm upgrade --install postgresql "{{manifests_dir}}/profiles-service/database" \
-    -n profiles-service \
-    --create-namespace \
-    --wait \
-    -f -
-    
-    set -a; source {{secrets_env_file}}; set +a && \
-    kubectl kustomize "{{manifests_dir}}/profiles-service/overlays/prod" | envsubst | kubectl apply -f - --wait
+
+kind-clean-frontend:
+    kubectl kustomize "{{manifests_dir}}/frontend/overlays/prod" | envsubst | kubectl delete -f - --wait
 
 kind-clean-profiles-service:
     helm uninstall postgresql
     kubectl kustomize "{{manifests_dir}}/profiles-service/overlays/prod" | envsubst | kubectl delete -f - --wait
 
-kind-deploy-inference-service:
-    kubectl kustomize --load-restrictor LoadRestrictionsNone "manifests/inference-service/overlays/prod" | envsubst
-
 kind-clean-inference-service:
-    kubectl kustomize --load-restrictor LoadRestrictionsNone "manifests/inference-service/overlays/prod" |  envsubst | kubectl delete -f - --wait
+    helm delete ollama --namespace ${INFERENCE_NAMESPACE}
 
-kind-deploy-frontend:
-    kubectl kustomize "{{manifests_dir}}/frontend/overlays/prod" | envsubst | kubectl apply -f - --wait
+kind-clean-keycloak:
+    helm uninstall keycloak
+    kubectl delete ns keycloak --wait
 
-kind-clean-frontend:
-    kubectl kustomize "{{manifests_dir}}/frontend/overlays/prod" | envsubst | kubectl delete -f - --wait
+kind-clean-kgateway:
+    helm uninstall kgateway
+    kubectl delete ns kgateway-system --wait
 
-kind-clean: 
+kind-clean: kind-clean-frontend kind-clean-profiles-service kind-clean-inference-service kind-clean-keycloak kind-clean-kgateway
     kind delete cluster --name={{cluster_name}}
 
 kind-destroy: kind-clean destroy

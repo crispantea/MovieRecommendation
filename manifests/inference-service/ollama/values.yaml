@@ -1,0 +1,18 @@
+ollama:
+  fullnameOverride: ${INFERENCE_OLLAMA_SERVICE_NAME}
+
+  image:
+    repository: ${INFERENCE_OLLAMA_IMAGE_REPO}
+    tag: ${INFERENCE_OLLAMA_IMAGE_TAG}
+    pullPolicy: "Never"
+
+  ollama:
+    port: 11434
+    models:
+      pull:
+        - ${INFERENCE_OLLAMA_MODEL}
+      run:
+        - ${INFERENCE_OLLAMA_MODEL}
+
+  persistentVolume:
+    enabled: false

@@ -10,9 +10,3 @@ labels:
 
 resources:
   - ../../base
-
-configMapGenerator:
-  - name: ollama-init
-    files:
-    # This relative path makes us need that workaround seen on the justfile (--load-restrictor LoadRestrictionsNone "manifests/inference-service/overlays/prod")
-      - ollama-init.sh=../../../../services/inference-service/ollama-init.sh

@@ -7,4 +7,4 @@ spec:
     app.kubernetes.io/name: ${INFERENCE_SERVICE_NAME}
   ports:
     - port: ${INFERENCE_SERVICE_PORT}
-      targetPort: ${INFERENCE_CONTAINER_PORT}
+      targetPort: ${INFERENCE_SERVICE_PORT}
