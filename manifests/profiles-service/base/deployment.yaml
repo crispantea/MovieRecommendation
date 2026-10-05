@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: profiles-service
-          image: agi-profiles-service
+          image: ${PROFILES_SERVICE_IMAGE}
           imagePullPolicy: Never
           envFrom:
           - configMapRef:

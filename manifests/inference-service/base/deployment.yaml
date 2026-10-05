@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: inference-service
-          image: agi-inference-service
+          image: ${INFERENCE_SERVICE_IMAGE}
           imagePullPolicy: Never
           ports:
             - containerPort: "${INFERENCE_CONTAINER_PORT}"
@@ -23,7 +23,7 @@ spec:
                 name: ${INFERENCE_SERVICE_NAME}
 
         - name: inference-service-ollama
-          image: ollama/ollama:0.34.1
+          image: ${INFERENCE_OLLAMA_IMAGE}
           command: ["/bin/sh", "/scripts/ollama-init.sh"]
           ports:
             - name: ollama

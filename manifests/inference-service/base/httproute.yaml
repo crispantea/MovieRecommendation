@@ -10,7 +10,7 @@ spec:
   - matches:
     - path:
         type: PathPrefix
-        value: / # TODO: Change by the actual prefix
+        value: ${INFERENCE_PATH}
     backendRefs:
     - name: ${INFERENCE_SERVICE_NAME}
       port: ${INFERENCE_SERVICE_PORT}

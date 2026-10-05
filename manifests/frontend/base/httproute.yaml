@@ -10,7 +10,7 @@ spec:
   - matches:
     - path:
         type: PathPrefix
-        value: /
+        value: ${FRONTEND_PATH}
     backendRefs:
     - name: ${FRONTEND_SERVICE_NAME}
       port: ${FRONTEND_SERVICE_PORT}

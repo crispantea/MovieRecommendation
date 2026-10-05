@@ -68,7 +68,7 @@ services:
   # ========== Inference Service ================================================================= #
   # ============================================================================================== #
   inference-service:
-    image: agi-inference-service
+    image: ${INFERENCE_SERVICE_IMAGE}
     build:
       context: ./inference-service
     container_name: inference-service
@@ -96,8 +96,7 @@ services:
         condition: service_healthy
 
   inference-service-ollama:
-    # ref: https://hub.docker.com/r/ollama/ollama
-    image: ollama/ollama:0.34.1
+    image: ${INFERENCE_OLLAMA_IMAGE}
     container_name: inference-service-ollama
     volumes:
       # - ollama_data:/root/.ollama
@@ -121,7 +120,7 @@ services:
   # ========== Profiles Catalog Service ========================================================== #
   # ============================================================================================== #
   profiles-service:
-    image: agi-profiles-service
+    image: ${PROFILES_SERVICE_IMAGE}
     build:
       context: ./profiles-service
     container_name: profiles-service
@@ -220,7 +219,7 @@ services:
   # ========== Frontend Service ================================================================== #
   # ============================================================================================== #
   frontend:
-    image: agi-frontend
+    image: ${FRONTEND_IMAGE}
     container_name: frontend
     build:
       context: ./frontend

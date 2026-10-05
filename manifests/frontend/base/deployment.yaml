@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: agi-frontend
+          image: ${FRONTEND_IMAGE}
           imagePullPolicy: Never
           ports:
             - containerPort: ${FRONTEND_SERVICE_PORT}

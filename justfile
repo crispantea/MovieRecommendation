@@ -98,9 +98,9 @@ kind-init:
     kind get clusters | grep -qx "{{cluster_name}}" || kind create cluster --config="{{manifests_dir}}/kind-cluster.yaml" --name={{cluster_name}}
 
 kind-load-images: kind-init
-    kind load docker-image agi-frontend:latest --name={{cluster_name}}
-    kind load docker-image agi-profiles-service:latest --name={{cluster_name}}
-    kind load docker-image agi-inference-service:latest --name={{cluster_name}}
+    kind load docker-image ${FRONTEND_IMAGE}:latest --name={{cluster_name}}
+    kind load docker-image ${PROFILES_SERVICE_IMAGE}:latest --name={{cluster_name}}
+    kind load docker-image ${INFERENCE_SERVICE_IMAGE}:latest --name={{cluster_name}}
 
 kind-deploy: kind-load-images
     # ---- Add required Helm repos and deploy Gateway API & kgateway CRDs ----

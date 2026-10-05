@@ -1,5 +1,5 @@
 postgresql:
-  fullnameOverride: profiles-service-database
+  fullnameOverride: ${PROFILES_DB_SERVICE_NAME}
   global:
     postgresql:
       auth:
