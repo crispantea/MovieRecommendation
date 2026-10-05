@@ -10,13 +10,14 @@ spec:
     - matches:
         - path:
             type: PathPrefix
-            value: /api/profiles
-      filters:
-        - type: URLRewrite
-          urlRewrite:
-            path:
-              type: ReplacePrefixMatch
-              replacePrefixMatch: /profiles
+            value: ${PROFILES_PATH}
+      # TODO:
+      # filters:
+      #   - type: URLRewrite
+      #     urlRewrite:
+      #       path:
+      #         type: ReplacePrefixMatch
+      #         replacePrefixMatch: /
       backendRefs:
         - name: ${PROFILES_SERVICE_NAME}
           port: ${PROFILES_SERVICE_PORT}
