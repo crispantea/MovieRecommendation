@@ -69,17 +69,13 @@ local-init-keycloak:
 local-up: local-init-keycloak
     {{compose}} up -d --wait
 
-# Manually trigger movie dataset seeding (respects USE_TEMPLATE_DB or falls back)
+# Manually trigger movie dataset loading from movies.csv.gz
 seed-movies:
     {{compose}} exec movies-service python seed_db.py
 
-# Manually trigger movie seeding specifically with template dataset
-seed-movies-template:
-    {{compose}} exec movies-service python seed_db.py --clear --template
-
-# Manually trigger movie bulk ingestion from full CSV dataset
-seed-movies-csv:
-    {{compose}} exec movies-service python seed_db.py --clear --csv
+# Reload movie catalog from scratch (clears existing entries)
+seed-movies-reload:
+    {{compose}} exec movies-service python seed_db.py --clear
 
 
 # Tear down all running containers
@@ -152,7 +148,7 @@ kind-deploy-profiles-service:
     --create-namespace \
     --wait \
     -f -
-    
+
     set -a; source {{secrets_env_file}}; set +a && \
     kubectl kustomize "{{manifests_dir}}/profiles-service/overlays/prod" | envsubst | kubectl apply -f - --wait
 
@@ -197,7 +193,7 @@ kind-clean-kgateway:
     helm uninstall kgateway
     kubectl delete ns kgateway-system --wait
 
-kind-clean: kind-clean-frontend kind-clean-profiles-service kind-clean-inference-service kind-clean-keycloak kind-clean-kgateway
+kind-clean:
     kind delete cluster --name={{cluster_name}}
 
 kind-destroy: kind-clean destroy

@@ -177,7 +177,6 @@ services:
       KEYCLOAK_ISSUER: http://localhost:${KEYCLOAK_HOST_PORT}/realms/${KEYCLOAK_APP_REALM}
       KEYCLOAK_JWKS_URL: http://auth-service:8080/realms/${KEYCLOAK_APP_REALM}/protocol/openid-connect/certs
       AUDIENCE: ${MOVIES_AUDIENCE}
-      USE_TEMPLATE_DB: ${USE_TEMPLATE_DB:-true}
       DISABLE_AUTH: ${DISABLE_AUTH:-false}
     ports:
       - "${MOVIES_HOST_PORT}:${MOVIES_CONTAINER_PORT}"

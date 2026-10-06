@@ -36,8 +36,3 @@ gcphosts
 
 .env.secrets
 .venv/
-
-# ----------------------------------------------
-# MOVIES DATASET
-# ----------------------------------------------
-services/movies-service/data/
