@@ -24,6 +24,8 @@ server {
 
   location /inference/ {
     proxy_pass ${INFERENCE_SERVICE_INTERNAL_URL}/;
+    proxy_send_timeout 300s;
+    proxy_read_timeout 300s;
     proxy_set_header Host \$proxy_host;
     proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto \$scheme;
