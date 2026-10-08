@@ -1,0 +1,64 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: no
+  vars:
+    images:
+      - agi-backend:latest
+      - agi-frontend:latest
+      - agi-inference-service:latest
+      # - agi-movies-service:latest # TODO: Uncomment once working!
+      - agi-profiles-service:latest
+  tasks:
+    - name: export images to a compressed archive
+      shell: |
+        set -o pipefail
+        docker save {{ images | join(' ') }} | gzip > /tmp/agi-images.tar.gz
+      args:
+        executable: /bin/bash
+
+- hosts: all
+  gather_facts: no
+  vars:
+    expected_images: 4
+  tasks:
+    - name: count agi images already on the node
+      become: yes
+      shell: ctr -n k8s.io images ls -q | grep -c 'agi-' || true
+      register: present
+      changed_when: false
+
+    - name: copy image archive to the node (resumable)
+      ansible.posix.synchronize:
+        src: /tmp/agi-images.tar.gz
+        dest: /tmp/agi-images.tar.gz
+        rsync_opts:
+          - "--partial"
+      become: no
+      register: sync
+      until: sync is succeeded
+      retries: 3
+      delay: 5
+      when: present.stdout | int < expected_images
+
+    - name: import images into containerd (k8s.io namespace)
+      become: yes
+      shell: |
+        set -o pipefail
+        gunzip -c /tmp/agi-images.tar.gz | ctr -n k8s.io images import --all-platforms -
+      args:
+        executable: /bin/bash
+      when: present.stdout | int < expected_images
+
+    - name: verify all images are present
+      become: yes
+      shell: ctr -n k8s.io images ls -q | grep -c 'agi-'
+      register: after
+      changed_when: false
+      failed_when: after.stdout | int < expected_images
+
+    - name: remove archive from the node
+      become: yes
+      file:
+        path: /tmp/agi-images.tar.gz
+        state: absent

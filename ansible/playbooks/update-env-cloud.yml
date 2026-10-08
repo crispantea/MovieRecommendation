@@ -1,0 +1,17 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: no
+  vars:
+    env_file: "{{ playbook_dir }}/../../.env.cloud"
+    master_ip: "{{ hostvars[groups['master'][0]].api_external_ip }}"
+  tasks:
+    - name: set domain variables in .env.cloud to the master IP
+      lineinfile:
+        path: "{{ env_file }}"
+        regexp: '^{{ item }}='
+        line: '{{ item }}={{ master_ip }}'
+      loop:
+        - APP_DOMAIN
+        - FRONTEND_DOMAIN
+        - KEYCLOAK_DOMAIN

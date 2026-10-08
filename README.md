@@ -1,35 +1,24 @@
 # AGI Project
 
-This repository is divided into layers that represent different stages of development and deployment:
+TODO: Rest of the README
 
-- `/infra`: Infrastructure configuration and deployment files
-- `/ansible`: Node preparation and server provisioning scripts
-- `/services`: Source code and container configuration for application microservices
+### Common Browser Issue: Insecure `IP:PORT` Access
 
----
+Browsers often block features on HTTP `IP:PORT` connections because they are treated as non-secure origins.
 
-## Deploy
+#### Fix for Google Chrome
 
-Follow the steps below to fully deploy this project:
-
-1. Deploy the infrastructure:
-```sh
-docker compose -f services/docker-compose.yml up -d
+1. Open Chrome and navigate to:
+```text
+chrome://flags/#unsafely-treat-insecure-origin-as-secure
 ```
 
----
-
-## Destroy
-
-Follow the steps below to destroy the project:
-
-1. Destroy the infrastructure:
-```sh
-docker compose -f services/docker-compose.yml down
+2. Enable **Insecure origins treated as secure**.
+3. Add your target origin to the text box, e.g.:
+```text
+http://35.234.71.189:30080
 ```
 
+*(Separate multiple origins with commas)*
 
-2. If you want to delete the images:
-```sh
-docker image rm agi-frontend agi-backend
-```
+4. Click **Relaunch** at the bottom right to restart Chrome.

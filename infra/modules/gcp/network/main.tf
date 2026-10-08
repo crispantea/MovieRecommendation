@@ -12,6 +12,7 @@ resource "google_compute_firewall" "cluster_rules" {
     protocol = "tcp"
     ports = ["80", "443", "30510", 
       "6443", "179", # Kubernetes API and Calico BGP
+      "30080" # Our APP entrypoint port, TODO: Put in variable and receive as input
     ]
   }
 
