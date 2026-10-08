@@ -1,7 +1,7 @@
 {
   "realm": "master",
   "enabled": true,
-  "sslRequired": "external",
+  "sslRequired": "none",
   "clients": [
     {
       "clientId": "terraform",

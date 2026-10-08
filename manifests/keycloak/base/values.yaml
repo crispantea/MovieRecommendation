@@ -23,6 +23,8 @@ keycloak:
   httpRelativePath: "/auth/"
   image:
     repository: bitnamilegacy/keycloak
+
+  httpEnabled: true
   
   keycloakConfigCli:
     enabled: true

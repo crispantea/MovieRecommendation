@@ -8,7 +8,7 @@ resource "keycloak_realm" "agi_project" {
   login_with_email_allowed       = true
   reset_password_allowed         = true
   verify_email                   = false # set to true once an smtp_server is configured
-  ssl_required                   = "external" # TODO: Check this
+  ssl_required                   = "none" # TODO: Check this
 
   password_policy = "notUsername"
 

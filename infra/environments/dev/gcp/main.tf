@@ -21,6 +21,7 @@ resource "local_file" "ansible_inventory" {
           hosts = {
             (module.compute.master.name) = {
               ansible_host = module.compute.master.ip
+              api_external_ip = module.compute.master.ip
             }
           }
         }

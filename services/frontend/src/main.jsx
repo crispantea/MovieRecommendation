@@ -12,7 +12,7 @@ root.render(<p>Signing you in...</p>)
 keycloak.onAuthRefreshError = () => keycloak.login()
 
 keycloak
-  .init({ onLoad: 'login-required', pkceMethod: 'S256' })
+  .init({ onLoad: 'login-required', checkLoginIframe: false })
   .then(() => {
     root.render(
       <StrictMode>
