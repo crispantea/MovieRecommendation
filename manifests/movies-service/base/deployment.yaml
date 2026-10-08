@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${MOVIES_SERVICE_NAME}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ${MOVIES_SERVICE_NAME}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ${MOVIES_SERVICE_NAME}
+    spec:
+      containers:
+        - name: movies-service
+          image: ${MOVIES_SERVICE_IMAGE}
+          imagePullPolicy: Never
+          ports:
+            - containerPort: "${MOVIES_CONTAINER_PORT}"
+          envFrom:
+            - configMapRef:
+                name: ${MOVIES_SERVICE_NAME}

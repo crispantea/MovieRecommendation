@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${MOVIES_SERVICE_NAME}
+data:
+  # TODO: Same workaround that's needed for the inference-service
+  PORT: "3001"
+  DATABASE_URL: "postgresql://${MOVIES_DB_USER}:${MOVIES_DB_PASSWORD}@${MOVIES_DB_SERVICE_NAME}:5432/${MOVIES_DB_NAME}"

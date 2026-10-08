@@ -202,14 +202,11 @@ services:
       POSTGRES_USER: ${MOVIES_DB_USER}
       POSTGRES_PASSWORD: ${MOVIES_DB_PASSWORD}
       POSTGRES_DB: ${MOVIES_DB_NAME}
-      PGDATA: /var/lib/postgresql/data
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
       interval: 2s
       timeout: 1s
       retries: 5
-    volumes:
-      - movies_db_data:/var/lib/postgresql/data
     ports:
       - "${MOVIES_DB_HOST_PORT}:5432"
 
@@ -239,5 +236,3 @@ services:
       inference-service:
         condition: service_healthy
 
-volumes:
-  movies_db_data:

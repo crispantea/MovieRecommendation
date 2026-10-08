@@ -1,0 +1,8 @@
+postgresql:
+  fullnameOverride: ${MOVIES_DB_SERVICE_NAME}
+  global:
+    postgresql:
+      auth:
+        username: ${MOVIES_DB_USER}
+        password: ${MOVIES_DB_PASSWORD}
+        database: ${MOVIES_DB_NAME}
