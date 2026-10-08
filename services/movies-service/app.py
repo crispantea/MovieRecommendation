@@ -3,7 +3,7 @@ import time
 
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import cast, or_, func
+from sqlalchemy import cast, and_, or_, func
 
 import seed_db
 
@@ -69,11 +69,13 @@ def list_movies():
     query = db.session.query(Movie)
 
     # 1. Filter by genres if requested
+    # Note: Using `and_` ensures movies must match ALL requested genres (e.g., both Sci-Fi AND Horror)
+    # rather than `or_` which would match movies containing any single genre from the list.
     genres = request.args.get("genres") or request.args.get("genre")
     if genres:
         terms = [g.strip() for g in genres.split(",") if g.strip()]
         if terms:
-            query = query.filter(or_(*(cast(Movie.genres, db.String).ilike(f"%{t}%") for t in terms)))
+            query = query.filter(and_(*(cast(Movie.genres, db.String).ilike(f"%{t}%") for t in terms)))
 
     # 2. Filter by minimum release year if requested
     min_year = request.args.get("min_year")
