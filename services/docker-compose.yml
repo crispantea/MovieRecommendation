@@ -235,4 +235,3 @@ services:
         condition: service_healthy
       inference-service:
         condition: service_healthy
-
