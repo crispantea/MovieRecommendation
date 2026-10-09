@@ -22,6 +22,7 @@ manifests_dir := "manifests"
 
 tf_dev_dir := tf_dir + "/environments/dev"
 tf_dev_auth_dir := tf_dev_dir + "/auth"
+tf_dev_grafana_dir := tf_dev_dir + "/grafana"
 
 # --------------------------------------------------------------
 # Exported Variables - needed across scripts
@@ -103,8 +104,10 @@ kind-init:
     kind load docker-image ${INFERENCE_SERVICE_IMAGE}:latest --name={{cluster_name}}
 
 kube-prepare:
-    # ---- Add required Helm repos and deploy Gateway API & kgateway CRDs ----
-    # Add bitnami repo
+    # ---- Add required Helm repos  ----
+    helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+    helm repo add grafana https://grafana.github.io/helm-charts
+
     helm repo add bitnami https://charts.bitnami.com/bitnami
     helm repo add otwld https://helm.otwld.com/
     helm repo update
@@ -200,7 +203,38 @@ kube-deploy-inference-service:
 kube-deploy-frontend:
     kubectl kustomize "{{manifests_dir}}/frontend/overlays/$ENV" | envsubst | kubectl apply -f - --wait
 
-kube-deploy: kube-prepare kube-deploy-kgateway kube-deploy-keycloak kube-deploy-profiles-service kube-deploy-movies-service kube-deploy-inference-service kube-deploy-frontend
+kube-deploy-mimir:
+    helm install mimir grafana/mimir-distributed \
+        -n ${MIMIR_NAMESPACE} \
+        --create-namespace \
+        -f "{{manifests_dir}}/observability/mimir/values.yaml" \
+        --wait
+
+kube-deploy-grafana:
+    helm dependency build "{{manifests_dir}}/observability/grafana"
+    set -a; source {{secrets_env_file}}; set +a && \
+    envsubst < "{{manifests_dir}}/observability/grafana/values.yaml" | \
+    helm upgrade --install grafana "{{manifests_dir}}/observability/grafana" \
+    -n ${GRAFANA_NAMESPACE} \
+    --create-namespace \
+    --wait \
+    -f -
+
+    # Initialize grafana resources using terraform
+    set -a; source {{secrets_env_file}}; set +a && \
+    . {{scripts_dir}}/terraform/grafana/export-input-vars.sh && \
+    terraform -chdir={{tf_dev_grafana_dir}} init -input=false && \
+    terraform -chdir={{tf_dev_grafana_dir}} apply -auto-approve
+
+kube-deploy-monitoring:
+    envsubst < "{{manifests_dir}}/observability/otel/values.yaml" | \
+    helm install opentelemetry-collector open-telemetry/opentelemetry-collector \
+        -n ${MONITORING_NAMESPACE} \
+        --create-namespace \
+        --wait \
+        -f -
+
+kube-deploy: kube-prepare kube-deploy-kgateway kube-deploy-keycloak kube-deploy-profiles-service kube-deploy-movies-service kube-deploy-inference-service kube-deploy-frontend kube-deploy-mimir kube-deploy-grafana kube-deploy-monitoring
 
 kube-clean-kgateway:
     helm uninstall kgateway -n ${KGATEWAY_NAMESPACE}
@@ -219,12 +253,22 @@ kube-clean-movies-service:
     kubectl kustomize "{{manifests_dir}}/movies-service/overlays/prod" | envsubst | kubectl delete -f - --wait
 
 kube-clean-inference-service:
-    helm delete ollama -n ${INFERENCE_NAMESPACE}
+    helm delete ollama -n ${INFERENCE_NAMESPACE} --wait
 
 kube-clean-frontend:
     kubectl kustomize "{{manifests_dir}}/frontend/overlays/$ENV" | envsubst | kubectl delete -f - --wait
 
-kube-clean: kube-clean-frontend kube-clean-movies-service kube-clean-profiles-service kube-clean-keycloak kube-clean-kgateway
+kube-clean-mimir:
+    helm uninstall mimir -n ${MIMIR_NAMESPACE}
+    kubectl delete ns ${MIMIR_NAMESPACE} --wait
+
+kube-clean-grafana:
+    helm uninstall grafana -n ${GRAFANA_NAMESPACE}
+    kubectl delete ns ${GRAFANA_NAMESPACE} --wait
+
+kube-clean-monitoring:
+    helm uninstall opentelemetry-collector -n ${MONITORING_NAMESPACE}
+    kubectl delete ns ${MONITORING_NAMESPACE} --wait
 
 kind-up: kind-init kube-deploy
 

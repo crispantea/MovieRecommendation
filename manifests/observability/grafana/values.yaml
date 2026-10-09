@@ -1,0 +1,23 @@
+httproutepath: ${GRAFANA_PATH}
+
+
+grafana:
+  adminUser: ${GRAFANA_ADMIN_USER}
+  adminPassword: ${GRAFANA_ADMIN_PASSWORD}
+
+  persistence:
+    enabled: false       # dev: dashboards you build in the UI are lost on restart
+
+  env:
+    GF_SERVER_ROOT_URL: "http://${APP_DOMAIN}:${APP_HOST_PORT}${GRAFANA_PATH}"
+    GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Mimir
+          type: prometheus
+          access: proxy
+          url: http://mimir-gateway.${MIMIR_NAMESPACE}.svc:80/prometheus
+          isDefault: true
