@@ -94,6 +94,8 @@ kind-init:
     kind get clusters | grep -qx "{{cluster_name}}" || kind create cluster --config="{{manifests_dir}}/kind-cluster.yaml" --name={{cluster_name}}
     kind load docker-image ${PROFILES_SERVICE_IMAGE}:latest --name={{cluster_name}}
     kind load docker-image ${MOVIES_SERVICE_IMAGE}:latest --name={{cluster_name}}
+    # The line bellow causes errors on some docker versions, we will pull it directly when manifests need it instead
+    # of loading it into the cluster
     # kind load docker-image ${INFERENCE_OLLAMA_IMAGE_REPO}:${INFERENCE_OLLAMA_IMAGE_TAG} --name={{cluster_name}}
     kind load docker-image ${FRONTEND_IMAGE}:latest --name={{cluster_name}}
     kind load docker-image ${INFERENCE_SERVICE_IMAGE}:latest --name={{cluster_name}}
@@ -196,7 +198,7 @@ kube-deploy-inference-service:
 kube-deploy-frontend:
     kubectl kustomize "{{manifests_dir}}/frontend/overlays/prod" | envsubst | kubectl apply -f - --wait
 
-kube-deploy: kube-prepare kube-deploy-kgateway kube-deploy-keycloak kube-deploy-profiles-service kube-deploy-movies-service kube-deploy-frontend
+kube-deploy: kube-prepare kube-deploy-kgateway kube-deploy-keycloak kube-deploy-profiles-service kube-deploy-movies-service kube-deploy-inference-service kube-deploy-frontend
 
 kube-clean-kgateway:
     helm uninstall kgateway -n ${KGATEWAY_NAMESPACE}
