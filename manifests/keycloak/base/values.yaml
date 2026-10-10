@@ -39,6 +39,12 @@ keycloak:
 
   postgresql:
     enabled: true
+
+    primary:
+      persistence:
+        enabled: ${PERSISTENCE_ENABLED}
+        existingClaim: keycloak-postgres-pvc
+
     image:
       repository: bitnamilegacy/postgresql
 
@@ -48,3 +54,7 @@ keycloak:
       existingSecret: "keycloak-db-credentials"
       secretKeys:
         userPasswordKey: "postgres-password"
+
+
+additional_values:
+  volume_handle: ${AUTH_VOLUME_HANDLE}

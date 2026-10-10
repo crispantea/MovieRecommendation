@@ -1,0 +1,14 @@
+{{- if .Values.postgresql.primary.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: profiles-postgres-pvc
+spec:
+  resources:
+    requests:
+      storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gcp-pd-retain
+  volumeName: profiles-postgres
+{{- end }}

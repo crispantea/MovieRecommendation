@@ -6,3 +6,18 @@ postgresql:
         username: ${PROFILES_DB_USER}
         password: ${PROFILES_DB_PASSWORD}
         database: ${PROFILES_DB_NAME}
+
+  primary:
+    persistence:
+      enabled: ${PERSISTENCE_ENABLED}
+      accessModes:
+        - ReadWriteOnce
+      storageClass: "gcp-pd-retain"
+      volumeName: "profiles-postgres"
+      existingClaim: "profiles-postgres-pvc"
+      size: 10Gi
+
+
+
+additional_values:
+  volume_handle: ${PROFILES_VOLUME_HANDLE}

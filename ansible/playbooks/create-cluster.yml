@@ -32,9 +32,6 @@
       shell: kubeadm token create  --print-join-command
       register: kubernetes_join_command
 
-    - debug:
-        msg: "{{ kubernetes_join_command.stdout }}"
-
     - name: Copy join command to local file
       become: no
       delegate_to: localhost
@@ -46,13 +43,13 @@
     - name: fetch admin kubeconfig to local machine
       fetch:
         src: /etc/kubernetes/admin.conf
-        dest: "{{ lookup('env', 'HOME') }}/.kube/gcp-config"
+        dest: "{{ playbook_dir }}/../../.kube/gcp-config"
         flat: true
 
     - name: point kubeconfig at the external IP
       become: no
       delegate_to: localhost
       replace:
-        path: "{{ lookup('env', 'HOME') }}/.kube/gcp-config"
+        path: "{{ playbook_dir }}/../../.kube/gcp-config"
         regexp: 'server: https://.*:6443'
         replace: 'server: https://{{ api_external_ip }}:6443'

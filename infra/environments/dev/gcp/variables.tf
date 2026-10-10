@@ -5,7 +5,7 @@ variable "GCP_PROJECT_ID" {}
 
 # A list of machine types is found at: https://cloud.google.com/compute/docs/machine-types
 variable "GCP_MACHINE_TYPE" {
-  default = "n2-standard-2"
+  default = "e2-standard-2"
 }
 
 # Regions list is found at:

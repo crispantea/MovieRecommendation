@@ -1,5 +1,5 @@
 set dotenv-load
-set shell := ["bash", "-euo", "pipefail", "-c", ': "${ENV?ENV is required, e.g. ENV=local just up}"; set -a; for e in $ENV; do . ".env.$e"; done; eval "$0"']
+set shell := ["bash", "-euo", "pipefail", "-c", ': "${ENV?ENV is required, e.g. ENV=local just up}"; set -a; . ".env.$ENV"; if [ -f .env.disks ]; then . .env.disks; fi; if [[ "$ENV" == "cloud" || "$ENV" == "kind" ]]; then . .env.kube; fi; eval "$0"']
 
 # --------------------------------------------------------------
 # Variables
@@ -11,6 +11,7 @@ local_env_file   := ".env.local"
 kind_env_file    := ".env.kind"
 cloud_env_file   := ".env.cloud"
 secrets_env_file := ".env.secrets"
+disks_env_file   := ".env.disks"
 
 # Directories
 services_dir := "services"
@@ -44,6 +45,7 @@ build:
 
 destroy:
     rm -f {{secrets_env_file}} \
+          {{disks_env_file}} \
           {{services_dir}}/authorization/import/realm-export.json \
           {{manifests_dir}}/keycloak/base/realm-export.json
 
@@ -161,7 +163,7 @@ kube-deploy-profiles-service:
         PORT_SUFFIX=":${KEYCLOAK_HOST_PORT}" ; \
     fi && \
     export KEYCLOAK_ISSUER="http://${APP_DOMAIN}${PORT_SUFFIX}${KEYCLOAK_PATH}/realms/${KEYCLOAK_APP_REALM}" && \
-    kubectl kustomize "{{manifests_dir}}/profiles-service/overlays/prod" | envsubst | kubectl apply -f - --wait
+    kubectl kustomize "{{manifests_dir}}/profiles-service/overlays/$ENV" | envsubst | kubectl apply -f - --wait
 
 kube-deploy-movies-service:
     # Build and deploy the movies-service database wrapper
@@ -193,10 +195,10 @@ kube-deploy-inference-service:
         PORT_SUFFIX=":${KEYCLOAK_HOST_PORT}" ; \
     fi && \
     export KEYCLOAK_ISSUER="http://${APP_DOMAIN}${PORT_SUFFIX}${KEYCLOAK_PATH}/realms/${KEYCLOAK_APP_REALM}" && \
-    kubectl kustomize "{{manifests_dir}}/inference-service/overlays/prod" | envsubst | kubectl apply -f - --wait
+    kubectl kustomize "{{manifests_dir}}/inference-service/overlays/$ENV" | envsubst | kubectl apply -f - --wait
 
 kube-deploy-frontend:
-    kubectl kustomize "{{manifests_dir}}/frontend/overlays/prod" | envsubst | kubectl apply -f - --wait
+    kubectl kustomize "{{manifests_dir}}/frontend/overlays/$ENV" | envsubst | kubectl apply -f - --wait
 
 kube-deploy: kube-prepare kube-deploy-kgateway kube-deploy-keycloak kube-deploy-profiles-service kube-deploy-movies-service kube-deploy-inference-service kube-deploy-frontend
 
@@ -210,7 +212,7 @@ kube-clean-keycloak:
 
 kube-clean-profiles-service:
     helm uninstall postgresql -n ${PROFILES_NAMESPACE}
-    kubectl kustomize "{{manifests_dir}}/profiles-service/overlays/prod" | envsubst | kubectl delete -f - --wait
+    kubectl kustomize "{{manifests_dir}}/profiles-service/overlays/$ENV" | envsubst | kubectl delete -f - --wait
 
 kube-clean-movies-service:
     helm uninstall postgresql -n ${MOVIES_NAMESPACE}
@@ -220,7 +222,7 @@ kube-clean-inference-service:
     helm delete ollama -n ${INFERENCE_NAMESPACE}
 
 kube-clean-frontend:
-    kubectl kustomize "{{manifests_dir}}/frontend/overlays/prod" | envsubst | kubectl delete -f - --wait
+    kubectl kustomize "{{manifests_dir}}/frontend/overlays/$ENV" | envsubst | kubectl delete -f - --wait
 
 kube-clean: kube-clean-frontend kube-clean-movies-service kube-clean-profiles-service kube-clean-keycloak kube-clean-kgateway
 
@@ -243,7 +245,7 @@ mgmt_ansible_dir := mgmt_project_dir + "/" + ansible_dir
 
 mgmt-up:
 	docker build -t mgmt ./mgmt
-	docker run --rm --name mgmt --hostname mgmt -v "$(pwd):{{mgmt_project_dir}}" -d mgmt
+	docker run -v /var/run/docker.sock:/var/run/docker.sock --rm --name mgmt --hostname mgmt -v "$(pwd):{{mgmt_project_dir}}" -d mgmt
 
 mgmt-down:
 	docker stop mgmt
@@ -264,9 +266,13 @@ cloud-infra-plan target="":
 
 cloud-infra-apply target="":
     if [ "{{target}}" = "local" ]; then \
-        terraform -chdir={{tf_gcp_dir}} apply; \
+        terraform -chdir={{tf_gcp_dir}} apply && \
+        terraform -chdir={{tf_gcp_dir}} output -json disks | \
+        jq -r 'to_entries[] | "\(.key | ascii_upcase)_VOLUME_HANDLE=\(.value.volume_handle)"' \
+        > {{disks_env_file}}; \
     else \
-        {{mgmt_cmd}} terraform -chdir={{mgmt_tf_gcp_dir}} apply; \
+        {{mgmt_cmd}} terraform -chdir={{mgmt_tf_gcp_dir}} apply && \
+        {{mgmt_cmd}} sh -c 'terraform -chdir={{mgmt_tf_gcp_dir}} output -json disks | jq -r '\''to_entries[] | "\(.key | ascii_upcase)_VOLUME_HANDLE=\(.value.volume_handle)"'\'' > {{mgmt_project_dir}}/{{disks_env_file}}'; \
     fi
 
 cloud-ansible target="": (cloud-infra-apply target)
@@ -285,18 +291,21 @@ cloud-infra-output target="":
 
 cloud-infra-destroy target="":
     if [ "{{target}}" = "local" ]; then \
-        terraform -chdir={{tf_gcp_dir}} destroy; \
+        terraform -chdir={{tf_gcp_dir}} destroy -target=module.compute -target=module.network; \
     else \
-        {{mgmt_cmd}} terraform -chdir={{mgmt_tf_gcp_dir}} destroy; \
+        {{mgmt_cmd}} terraform -chdir={{mgmt_tf_gcp_dir}} destroy -target=module.compute -target=module.network; \
     fi
 
 cloud-init target="":
-    kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.31/deploy/local-path-storage.yaml
-    kubectl patch storageclass local-path \
-        -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+    kubectl apply -f "{{manifests_dir}}/storage-class.yaml"
 
 cloud-up target="": (cloud-infra-apply target) (cloud-ansible target) (cloud-init target) kube-deploy
 
 cloud-clean target="": (cloud-infra-destroy target)
 
 cloud-destroy target="": (cloud-infra-destroy target) destroy
+    if [ "{{target}}" = "local" ]; then \
+        terraform -chdir={{tf_gcp_dir}} destroy; \
+    else \
+        {{mgmt_cmd}} terraform -chdir={{mgmt_tf_gcp_dir}} destroy; \
+    fi

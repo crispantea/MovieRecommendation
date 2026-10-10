@@ -1,13 +1,32 @@
+module "storage" {
+  source = "./../../../modules/gcp/storage"
+
+  GCP_PROJECT_ID = var.GCP_PROJECT_ID
+  GCP_ZONE = var.GCP_ZONE
+
+  services = {
+    auth = {
+      size = 10
+      type = "ssd"
+    }
+
+    profiles = {
+      size = 10
+      type = "ssd"
+    }
+  }
+}
+
 module "network" {
-    source = "./../../../modules/gcp/network"
+  source = "./../../../modules/gcp/network"
 }
 
 module "compute" {
-    source = "./../../../modules/gcp/compute"
+  source = "./../../../modules/gcp/compute"
 
-    public_key_path = var.public_key_path
-    GCP_MACHINE_TYPE = var.GCP_MACHINE_TYPE
-    GCP_ZONE = var.GCP_ZONE
+  public_key_path = var.public_key_path
+  GCP_MACHINE_TYPE = var.GCP_MACHINE_TYPE
+  GCP_ZONE = var.GCP_ZONE
 }
 
 resource "local_file" "ansible_inventory" {

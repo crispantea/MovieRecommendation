@@ -4,3 +4,4 @@
 - import_playbook: playbooks/workers-join.yml
 - import_playbook: playbooks/load-initial-images.yml
 - import_playbook: playbooks/update-env-cloud.yml
+- import_playbook: playbooks/install-csi-driver.yml

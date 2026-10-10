@@ -35,4 +35,6 @@ gcphosts
 # ----------------------------------------------
 
 .env.secrets
+.env.disks
 .venv/
+.kube/

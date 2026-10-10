@@ -4,7 +4,6 @@
   gather_facts: no
   vars:
     images:
-      - agi-backend:latest
       - agi-frontend:latest
       - agi-inference-service:latest
       # - agi-movies-service:latest # TODO: Uncomment once working!
@@ -20,7 +19,7 @@
 - hosts: all
   gather_facts: no
   vars:
-    expected_images: 4
+    expected_images: 3
   tasks:
     - name: count agi images already on the node
       become: yes
