@@ -4,7 +4,7 @@ ollama:
   image:
     repository: ${INFERENCE_OLLAMA_IMAGE_REPO}
     tag: ${INFERENCE_OLLAMA_IMAGE_TAG}
-    pullPolicy: "Never"
+    pullPolicy: "IfNotPresent"
 
   ollama:
     port: 11434

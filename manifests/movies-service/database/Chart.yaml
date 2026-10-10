@@ -1,0 +1,10 @@
+apiVersion: v2
+name: movies-postgres-wrapper
+description: PostgreSQL for movies-service
+type: application
+version: 0.1.0
+appVersion: "18"  # Postgres major version this service runs
+dependencies:
+  - name: postgresql
+    version: "18.12.4"
+    repository: https://charts.bitnami.com/bitnami

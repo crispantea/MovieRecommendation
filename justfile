@@ -58,7 +58,7 @@ compose := "docker compose --env-file " + global_env_file + \
                          " -f " + services_dir + "/docker-compose.yml"
 
 # Initialize Keycloak container and create required resources using terraform
-local-init-keycloak:
+local-init-keycloak: init
     {{compose}} up -d --wait auth-service
     set -a; source {{secrets_env_file}}; set +a && \
     . {{scripts_dir}}/terraform/keycloak/export-input-vars.sh && \
@@ -71,16 +71,15 @@ local-up: local-init-keycloak
 
 # Manually trigger movie dataset loading from movies.csv.gz
 seed-movies:
-    {{compose}} exec movies-service python seed_db.py
+    docker exec -it movies-service python seed_db.py
 
 # Reload movie catalog from scratch (clears existing entries)
 seed-movies-reload:
-    {{compose}} exec movies-service python seed_db.py --clear
-
+    docker exec -it movies-service python seed_db.py --drop-existing
 
 # Tear down all running containers
 local-clean:
-    {{compose}} down
+    {{compose}} down --volumes --remove-orphans
 
 # Full wipe (containers down + remove generated secrets)
 local-destroy: local-clean destroy
@@ -94,6 +93,9 @@ kind-init:
     # Create kind cluster (if doesnt exist)
     kind get clusters | grep -qx "{{cluster_name}}" || kind create cluster --config="{{manifests_dir}}/kind-cluster.yaml" --name={{cluster_name}}
     kind load docker-image ${PROFILES_SERVICE_IMAGE}:latest --name={{cluster_name}}
+    kind load docker-image ${MOVIES_SERVICE_IMAGE}:latest --name={{cluster_name}}
+    # The line bellow causes errors on some docker versions, we will pull it directly when manifests need it instead
+    # of loading it into the cluster
     # kind load docker-image ${INFERENCE_OLLAMA_IMAGE_REPO}:${INFERENCE_OLLAMA_IMAGE_TAG} --name={{cluster_name}}
     kind load docker-image ${FRONTEND_IMAGE}:latest --name={{cluster_name}}
     kind load docker-image ${INFERENCE_SERVICE_IMAGE}:latest --name={{cluster_name}}
@@ -161,6 +163,20 @@ kube-deploy-profiles-service:
     export KEYCLOAK_ISSUER="http://${APP_DOMAIN}${PORT_SUFFIX}${KEYCLOAK_PATH}/realms/${KEYCLOAK_APP_REALM}" && \
     kubectl kustomize "{{manifests_dir}}/profiles-service/overlays/prod" | envsubst | kubectl apply -f - --wait
 
+kube-deploy-movies-service:
+    # Build and deploy the movies-service database wrapper
+    helm dependency build "{{manifests_dir}}/movies-service/database"
+    set -a; source {{secrets_env_file}}; set +a && \
+    envsubst < "{{manifests_dir}}/movies-service/database/values.yaml" | \
+    helm upgrade --install postgresql "{{manifests_dir}}/movies-service/database" \
+    -n ${MOVIES_NAMESPACE} \
+    --create-namespace \
+    --wait \
+    -f -
+
+    set -a; source {{secrets_env_file}}; set +a && \
+    kubectl kustomize "{{manifests_dir}}/movies-service/overlays/prod" | envsubst | kubectl apply -f - --wait
+
 kube-deploy-inference-service:
     # Build and deploy the ollama wrapper
     helm dependency build "{{manifests_dir}}/inference-service/ollama"
@@ -182,7 +198,7 @@ kube-deploy-inference-service:
 kube-deploy-frontend:
     kubectl kustomize "{{manifests_dir}}/frontend/overlays/prod" | envsubst | kubectl apply -f - --wait
 
-kube-deploy: kube-prepare kube-deploy-kgateway kube-deploy-keycloak kube-deploy-profiles-service kube-deploy-frontend
+kube-deploy: kube-prepare kube-deploy-kgateway kube-deploy-keycloak kube-deploy-profiles-service kube-deploy-movies-service kube-deploy-inference-service kube-deploy-frontend
 
 kube-clean-kgateway:
     helm uninstall kgateway -n ${KGATEWAY_NAMESPACE}
@@ -196,11 +212,17 @@ kube-clean-profiles-service:
     helm uninstall postgresql -n ${PROFILES_NAMESPACE}
     kubectl kustomize "{{manifests_dir}}/profiles-service/overlays/prod" | envsubst | kubectl delete -f - --wait
 
+kube-clean-movies-service:
+    helm uninstall postgresql -n ${MOVIES_NAMESPACE}
+    kubectl kustomize "{{manifests_dir}}/movies-service/overlays/prod" | envsubst | kubectl delete -f - --wait
+
 kube-clean-inference-service:
     helm delete ollama -n ${INFERENCE_NAMESPACE}
 
 kube-clean-frontend:
     kubectl kustomize "{{manifests_dir}}/frontend/overlays/prod" | envsubst | kubectl delete -f - --wait
+
+kube-clean: kube-clean-frontend kube-clean-movies-service kube-clean-profiles-service kube-clean-keycloak kube-clean-kgateway
 
 kind-up: kind-init kube-deploy
 

@@ -11,6 +11,9 @@ spec:
     - path:
         type: PathPrefix
         value: ${INFERENCE_PATH}
+    timeouts:
+      request: 300s
+      backendRequest: 300s
     filters:
       - type: URLRewrite
         urlRewrite:
