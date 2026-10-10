@@ -1,20 +1,21 @@
-rollout_operator:
-  enabled: false
-
-ingester:
-  zoneAwareReplication:
+mimir:
+  rollout_operator:
     enabled: false
 
-store_gateway:
-  zoneAwareReplication:
+  ingester:
+    zoneAwareReplication:
+      enabled: false
+
+  store_gateway:
+    zoneAwareReplication:
+      enabled: false
+
+  alertmanager:
+    enabled: false
+  ruler:
+    enabled: false
+  overrides_exporter:
     enabled: false
 
-alertmanager:
-  enabled: false
-ruler:
-  enabled: false
-overrides_exporter:
-  enabled: false
-
-query_scheduler:
-  replicas: 1
+  query_scheduler:
+    replicas: 1

@@ -6,7 +6,7 @@
     images:
       - agi-frontend:latest
       - agi-inference-service:latest
-      # - agi-movies-service:latest # TODO: Uncomment once working!
+      - agi-movies-service:latest
       - agi-profiles-service:latest
   tasks:
     - name: export images to a compressed archive

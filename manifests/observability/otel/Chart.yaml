@@ -1,0 +1,10 @@
+apiVersion: v2
+name: otel
+description: A Helm chart for Kubernetes
+type: application
+version: "0.175.1"
+appVersion: "0.161.0"
+dependencies:
+  - name: opentelemetry-collector
+    version: "0.175.1"
+    repository: "https://open-telemetry.github.io/opentelemetry-helm-charts"

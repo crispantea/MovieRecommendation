@@ -204,11 +204,12 @@ kube-deploy-frontend:
     kubectl kustomize "{{manifests_dir}}/frontend/overlays/$ENV" | envsubst | kubectl apply -f - --wait
 
 kube-deploy-mimir:
-    helm install mimir grafana/mimir-distributed \
-        -n ${MIMIR_NAMESPACE} \
-        --create-namespace \
-        -f "{{manifests_dir}}/observability/mimir/values.yaml" \
-        --wait
+    helm dependency build "{{manifests_dir}}/observability/mimir"
+    helm upgrade --install mimir "{{manifests_dir}}/observability/mimir" \
+    -n ${MIMIR_NAMESPACE} \
+    --create-namespace \
+    -f "{{manifests_dir}}/observability/mimir/values.yaml" \
+    --wait
 
 kube-deploy-grafana:
     helm dependency build "{{manifests_dir}}/observability/grafana"
@@ -227,14 +228,15 @@ kube-deploy-grafana:
     terraform -chdir={{tf_dev_grafana_dir}} apply -auto-approve
 
 kube-deploy-monitoring:
+    helm dependency build "{{manifests_dir}}/observability/otel"
     envsubst < "{{manifests_dir}}/observability/otel/values.yaml" | \
-    helm install opentelemetry-collector open-telemetry/opentelemetry-collector \
-        -n ${MONITORING_NAMESPACE} \
-        --create-namespace \
-        --wait \
-        -f -
+    helm upgrade --install opentelemetry-collector "{{manifests_dir}}/observability/otel" \
+    -n ${MONITORING_NAMESPACE} \
+    --create-namespace \
+    --wait \
+    -f -
 
-kube-deploy: kube-prepare kube-deploy-kgateway kube-deploy-keycloak kube-deploy-profiles-service kube-deploy-movies-service kube-deploy-inference-service kube-deploy-frontend kube-deploy-mimir kube-deploy-grafana kube-deploy-monitoring
+kube-deploy: kube-prepare kube-deploy-kgateway kube-deploy-keycloak kube-deploy-profiles-service kube-deploy-frontend kube-deploy-mimir kube-deploy-grafana kube-deploy-monitoring
 
 kube-clean-kgateway:
     helm uninstall kgateway -n ${KGATEWAY_NAMESPACE}
