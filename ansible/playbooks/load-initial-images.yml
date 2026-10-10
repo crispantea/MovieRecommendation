@@ -19,7 +19,7 @@
 - hosts: all
   gather_facts: no
   vars:
-    expected_images: 3
+    expected_images: 4
   tasks:
     - name: count agi images already on the node
       become: yes

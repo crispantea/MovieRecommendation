@@ -344,6 +344,9 @@ cloud-infra-destroy target="":
 
 cloud-init target="":
     kubectl apply -f "{{manifests_dir}}/storage-class.yaml"
+    kubectl create namespace gce-pd-csi-driver --dry-run=client -o yaml | kubectl apply -f -
+    kubectl -n gce-pd-csi-driver create secret generic cloud-sa --from-file=cloud-sa.json={{tf_gcp_dir}}/credentials.json --dry-run=client -o yaml | kubectl apply -f -
+    kubectl apply -k "github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver/deploy/kubernetes/overlays/stable-master?ref=master"
 
 cloud-up target="": (cloud-infra-apply target) (cloud-ansible target) (cloud-init target) kube-deploy
 
