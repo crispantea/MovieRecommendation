@@ -8,13 +8,21 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update
 
 # Install facilities.
-RUN apt-get install -y supervisor openssh-server iputils-ping unzip
+RUN apt-get install -y supervisor openssh-server iputils-ping unzip jq rsync
 
 # Install additional facilities.
 RUN apt-get -y install libssl-dev libffi-dev gnupg python3-dev python3-pip snapd
 
+# Install docker-cli
+RUN apt-get update && apt-get install -y curl ca-certificates && \
+    install -m 0755 -d /etc/apt/keyrings && \
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo ${UBUNTU_CODENAME:-$VERSION_CODENAME}) stable" > /etc/apt/sources.list.d/docker.list && \
+    apt-get update && apt-get install -y docker-ce-cli && \
+    rm -rf /var/lib/apt/lists/*
+
 # Install ansible.
-RUN apt install -y software-properties-common && \
+RUN apt-get update && apt install -y software-properties-common && \
     apt-add-repository -y -u ppa:ansible/ansible && \
     apt-get update && \
     apt-get install -y ansible

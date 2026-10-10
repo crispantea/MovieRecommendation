@@ -9,3 +9,7 @@ output "master_ssh" {
 output "workers"  {
   value = module.compute.workers
 }
+
+output "disks" {
+  value = module.storage.disks
+}
