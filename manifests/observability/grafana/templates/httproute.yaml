@@ -1,0 +1,17 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "grafana.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  parentRefs:
+  - name: default-gateway
+    namespace: kgateway-system
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: {{ .Values.httproutepath }}
+    backendRefs:
+    - name: {{ include "grafana.fullname" . }}
+      port: {{ .Values.grafana.service.port  }}

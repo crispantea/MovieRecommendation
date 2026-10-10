@@ -25,6 +25,9 @@ keycloak:
     repository: bitnamilegacy/keycloak
 
   httpEnabled: true
+
+  metrics:
+    enabled: true
   
   keycloakConfigCli:
     enabled: true

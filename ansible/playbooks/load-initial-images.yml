@@ -6,7 +6,7 @@
     images:
       - agi-frontend:latest
       - agi-inference-service:latest
-      # - agi-movies-service:latest # TODO: Uncomment once working!
+      - agi-movies-service:latest
       - agi-profiles-service:latest
   tasks:
     - name: export images to a compressed archive
@@ -19,7 +19,7 @@
 - hosts: all
   gather_facts: no
   vars:
-    expected_images: 3
+    expected_images: 4
   tasks:
     - name: count agi images already on the node
       become: yes
