@@ -269,10 +269,10 @@ kube-clean-grafana:
     kubectl delete ns ${GRAFANA_NAMESPACE} --wait
 
 kube-clean-otel:
-    helm uninstall opentelemetry-collector -n ${OTEL_NAMESPACE}
+    helm uninstall ${OTEL_RELEASE_NAME} -n ${OTEL_NAMESPACE}
     kubectl delete ns ${OTEL_NAMESPACE} --wait
 
-kube-clean: kube-clean-monitoring kube-clean-grafana kube-clean-mimir kube-clean-frontend kube-clean-inference-service kube-clean-movies-service kube-clean-profiles-service kube-clean-keycloak kube-clean-kgateway
+kube-clean: kube-clean-otel kube-clean-grafana kube-clean-mimir kube-clean-frontend kube-clean-inference-service kube-clean-movies-service kube-clean-profiles-service kube-clean-keycloak kube-clean-kgateway
 
 kind-up: kind-init kube-deploy
 
