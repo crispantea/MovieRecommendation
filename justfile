@@ -227,16 +227,16 @@ kube-deploy-grafana:
     terraform -chdir={{tf_dev_grafana_dir}} init -input=false && \
     terraform -chdir={{tf_dev_grafana_dir}} apply -auto-approve
 
-kube-deploy-monitoring:
+kube-deploy-otel:
     helm dependency build "{{manifests_dir}}/observability/otel"
     envsubst < "{{manifests_dir}}/observability/otel/values.yaml" | \
-    helm upgrade --install opentelemetry-collector "{{manifests_dir}}/observability/otel" \
-    -n ${MONITORING_NAMESPACE} \
+    helm upgrade --install ${OTEL_RELEASE_NAME} "{{manifests_dir}}/observability/otel" \
+    -n ${OTEL_NAMESPACE} \
     --create-namespace \
     --wait \
     -f -
 
-kube-deploy: kube-prepare kube-deploy-kgateway kube-deploy-keycloak kube-deploy-profiles-service kube-deploy-frontend kube-deploy-mimir kube-deploy-grafana kube-deploy-monitoring
+kube-deploy: kube-prepare kube-deploy-kgateway kube-deploy-keycloak kube-deploy-profiles-service kube-deploy-frontend kube-deploy-mimir kube-deploy-grafana kube-deploy-otel
 
 kube-clean-kgateway:
     helm uninstall kgateway -n ${KGATEWAY_NAMESPACE}
@@ -268,9 +268,9 @@ kube-clean-grafana:
     helm uninstall grafana -n ${GRAFANA_NAMESPACE}
     kubectl delete ns ${GRAFANA_NAMESPACE} --wait
 
-kube-clean-monitoring:
-    helm uninstall opentelemetry-collector -n ${MONITORING_NAMESPACE}
-    kubectl delete ns ${MONITORING_NAMESPACE} --wait
+kube-clean-otel:
+    helm uninstall opentelemetry-collector -n ${OTEL_NAMESPACE}
+    kubectl delete ns ${OTEL_NAMESPACE} --wait
 
 kind-up: kind-init kube-deploy
 

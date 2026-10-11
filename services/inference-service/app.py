@@ -11,10 +11,12 @@ Endpoints:
 """
 
 import os
+import time
 import json
 import logging
 from datetime import datetime, timezone
 from functools import wraps
+from telemetry import init_metrics, get_llm_duration_histogram
 
 import requests
 import jwt
@@ -32,6 +34,11 @@ app = Flask(__name__)
 # ========== Configuration ======================================================================= #
 # ================================================================================================ #
 PORT = int(os.environ.get("PORT", 8000))
+
+# Service Variables
+INFERENCE_SERVICE_NAME = os.environ.get("INFERENCE_SERVICE_NAME", "inference-service")
+OTEL_EXPORTER_OTLP_ENDPOINT = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+DISABLE_INFERENCE_SERVICE_METRICS = os.environ.get("DISABLE_INFERENCE_SERVICE_METRICS", "true").lower() in ("true", "1", "yes")
 
 # Internal Services
 PROFILES_SERVICE_URL = os.environ.get("PROFILES_SERVICE_URL", "http://profiles-service:3000")
@@ -55,6 +62,9 @@ DISABLE_AUTH = os.environ.get("DISABLE_AUTH", "false").lower() in ("true", "1", 
 
 jwks_client = PyJWKClient(KEYCLOAK_JWKS_URL) if KEYCLOAK_JWKS_URL else None
 
+if not DISABLE_INFERENCE_SERVICE_METRICS:
+    init_metrics(INFERENCE_SERVICE_NAME, OTEL_EXPORTER_OTLP_ENDPOINT)
+    llm_duration = get_llm_duration_histogram(INFERENCE_SERVICE_NAME)
 
 def require_auth(f):
     @wraps(f)
@@ -440,11 +450,22 @@ def generate():
     else:
         candidates = fetch_candidate_movies(profile, headers)
 
+    if not DISABLE_INFERENCE_SERVICE_METRICS:
+        start = time.perf_counter()
+        status = "success"
     try:
         result = generate_recommendations(profile, candidates, message)
     except RuntimeError as exc:
+        if not DISABLE_INFERENCE_SERVICE_METRICS:
+            status = "error"
         logger.error("Generation failed: %s", exc)
         return jsonify({"error": "recommendation generation failed"}), 502
+    finally:
+        if not DISABLE_INFERENCE_SERVICE_METRICS:
+            llm_duration.record(
+                time.perf_counter() - start,
+                {"status": status},
+            )
 
     return jsonify({
         "recommendations": result["recommendations"],

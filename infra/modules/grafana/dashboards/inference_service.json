@@ -1,0 +1,34 @@
+{
+  "title": "LLM Average Latency",
+  "tags": ["Inference Service"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      { "name": "ds", "label": "Data source", "type": "datasource", "query": "prometheus", "current": {}, "hide": 0 }
+    ]
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Average LLM latency, success only (selected time range)",
+      "datasource": { "type": "prometheus", "uid": "${ds}" },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 2 } },
+      "targets": [
+        { "instant": true, "expr": "sum(increase(llm_request_duration_seconds_sum{status=\"success\"}[$__range])) / sum(increase(llm_request_duration_seconds_count{status=\"success\"}[$__range]))" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Average LLM latency, success only (last 1 min)",
+      "datasource": { "type": "prometheus", "uid": "${ds}" },
+      "gridPos": { "h": 6, "w": 16, "x": 8, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "sum(rate(llm_request_duration_seconds_sum{status=\"success\"}[1m])) / sum(rate(llm_request_duration_seconds_count{status=\"success\"}[1m]))" }
+      ]
+    }
+  ]
+}

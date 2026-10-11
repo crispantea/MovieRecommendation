@@ -7,3 +7,9 @@ resource "grafana_dashboard" "keycloak" {
   config_json = file("${path.module}/dashboards/keycloak.json")
   overwrite   = true
 }
+
+resource "grafana_dashboard" "inference_service" {
+  folder      = grafana_folder.app_monitoring.uid
+  config_json = file("${path.module}/dashboards/inference_service.json")
+  overwrite   = true
+}
