@@ -69,10 +69,10 @@ def call_llm(prompt: str) -> dict:
     resp.raise_for_status()
     data = resp.json()
     raw_text = data["choices"][0]["message"]["content"]
-    return _parse_json(raw_text)
+    return parse_json(raw_text)
 
 
-def _repair_truncated_json(text: str) -> str:
+def repair_truncated_json(text: str) -> str:
     stack = []
     in_string = False
     escape = False
@@ -123,7 +123,7 @@ def _repair_truncated_json(text: str) -> str:
     return repaired + closing
 
 
-def _parse_json(raw_text: str) -> dict:
+def parse_json(raw_text: str) -> dict:
     """
     Parses JSON from the LLM response, stripping markdown fences/preambles
     and repairing unclosed brackets if generation was truncated.
@@ -148,7 +148,7 @@ def _parse_json(raw_text: str) -> dict:
         parsed, _ = decoder.raw_decode(cleaned)
         return parsed
     except json.JSONDecodeError:
-        repaired = _repair_truncated_json(cleaned)
+        repaired = repair_truncated_json(cleaned)
         parsed, _ = decoder.raw_decode(repaired)
         return parsed
 

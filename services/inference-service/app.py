@@ -241,6 +241,16 @@ def fetch_candidate_movies(profile: dict, headers: dict | None = None) -> list[d
     else:
         fav_list = []
 
+    raw_actors = profile.get("favorite_actors") or []
+    if isinstance(raw_actors, str):
+        actor_list = [a.strip() for a in raw_actors.split(",") if a.strip()]
+    elif isinstance(raw_actors, (list, tuple, set)):
+        actor_list = [str(a).strip() for a in raw_actors if str(a).strip()]
+    else:
+        actor_list = []
+
+    mood = str(profile.get("mood") or "").strip()
+
     min_year = profile.get("min_year")
     try:
         min_year = int(min_year) if min_year is not None else None
@@ -250,6 +260,10 @@ def fetch_candidate_movies(profile: dict, headers: dict | None = None) -> list[d
     params = {}
     if fav_list:
         params["genres"] = ",".join(fav_list)
+    if actor_list:
+        params["actors"] = ",".join(actor_list)
+    if mood:
+        params["mood"] = mood
     if min_year is not None:
         params["min_year"] = min_year
 
@@ -281,38 +295,7 @@ def build_prompt(profile: dict, candidates: list, user_message: str | None) -> s
     - Movie candidates
     - Optionally, a custom user message
     """
-    # Ensure candidates in prompt are strictly pruned to essential fields and bounded <= CANDIDATE_LIMIT
-    pruned_candidates = []
-    for m in (candidates or [])[:CANDIDATE_LIMIT]:
-        if isinstance(m, dict):
-            title_val = str(m.get("title") or "").strip()
-            if not title_val:
-                continue
-
-            y = m.get("year") if m.get("year") is not None else m.get("release_year")
-            try:
-                year_val = int(y) if y is not None else None
-            except (ValueError, TypeError):
-                year_val = None
-
-            raw_g = m.get("genres")
-            if isinstance(raw_g, str):
-                g_list = [g.strip() for g in raw_g.split(",") if g.strip()]
-            elif isinstance(raw_g, (list, tuple, set)):
-                g_list = [str(g).strip() for g in raw_g if str(g).strip()]
-            else:
-                g_list = []
-
-            cand = {
-                "title": title_val,
-                "year": year_val,
-                "genres": g_list,
-            }
-            syn_val = str(m.get("synopsis") or "").strip()
-            if syn_val:
-                cand["synopsis"] = syn_val
-            pruned_candidates.append(cand)
-
+    pruned_candidates = (candidates or [])[:CANDIDATE_LIMIT]
     candidate_block = (
         json.dumps(pruned_candidates, separators=(",", ":"))
         if pruned_candidates
@@ -377,10 +360,10 @@ def call_llm(prompt: str) -> dict:
     resp.raise_for_status()
     data = resp.json()
     raw_text = data["choices"][0]["message"]["content"]
-    return _parse_json(raw_text)
+    return parse_json(raw_text)
 
 
-def _repair_truncated_json(text: str) -> str:
+def repair_truncated_json(text: str) -> str:
     """
     Attempts to close unclosed brackets/braces in a truncated or malformed
     JSON string by tracking delimiter state outside of string literals.
@@ -443,7 +426,7 @@ def _repair_truncated_json(text: str) -> str:
     return repaired + closing
 
 
-def _parse_json(raw_text: str) -> dict:
+def parse_json(raw_text: str) -> dict:
     """
     Parses JSON from the LLM response, stripping markdown fences/preambles
     and repairing unclosed brackets if generation was truncated.
@@ -471,22 +454,21 @@ def _parse_json(raw_text: str) -> dict:
         parsed, _ = decoder.raw_decode(cleaned)
         return parsed
     except json.JSONDecodeError:
-        repaired = _repair_truncated_json(cleaned)
+        repaired = repair_truncated_json(cleaned)
         parsed, _ = decoder.raw_decode(repaired)
         return parsed
 
 
-def _enrich_recommendations(llm_recs: list[dict], candidates: list[dict]) -> list[dict]:
+def enrich_recommendations(llm_recs: list[dict], candidates: list[dict]) -> list[dict]:
     """
     Populates catalog fields (year, genres, reason=synopsis) directly from the
     candidate pool rather than relying on the LLM to reproduce them.
     """
-    candidate_map = {}
-    for m in (candidates or []):
-        if isinstance(m, dict) and m.get("title"):
-            key = str(m["title"]).strip().lower()
-            if key and key not in candidate_map:
-                candidate_map[key] = m
+    candidate_map = {
+        str(m["title"]).strip().lower(): m
+        for m in (candidates or [])
+        if isinstance(m, dict) and m.get("title")
+    }
 
     enriched = []
     seen = set()
@@ -504,28 +486,17 @@ def _enrich_recommendations(llm_recs: list[dict], candidates: list[dict]) -> lis
             if cand is not None:
                 key = stripped_key
 
-        if key in seen:
+        if cand is None or key in seen:
             continue
 
-        if cand is not None:
-            seen.add(key)
-            year_val = cand.get("year") if cand.get("year") is not None else cand.get("release_year")
-            enriched.append({
-                "title": cand.get("title") or raw_title,
-                "year": year_val,
-                "genres": cand.get("genres") or [],
-                "reason": cand.get("synopsis") or "",
-                "confidence": rec["confidence"],
-            })
-        elif not candidate_map:
-            seen.add(key)
-            enriched.append({
-                "title": raw_title,
-                "year": rec.get("year"),
-                "genres": rec.get("genres") or [],
-                "reason": rec.get("reason") or "",
-                "confidence": rec["confidence"],
-            })
+        seen.add(key)
+        enriched.append({
+            "title": cand["title"],
+            "year": cand.get("year"),
+            "genres": cand.get("genres") or [],
+            "reason": cand.get("synopsis") or "",
+            "confidence": rec["confidence"],
+        })
 
     return enriched
 
@@ -542,7 +513,7 @@ def generate_recommendations(profile: dict, candidates: list, user_message: str 
             parsed = call_llm(prompt)
             validate(instance=parsed, schema=RECOMMENDATION_SCHEMA)
             return {
-                "recommendations": _enrich_recommendations(parsed["recommendations"], candidates)
+                "recommendations": enrich_recommendations(parsed["recommendations"], candidates)
             }
         except (json.JSONDecodeError, ValidationError, KeyError, requests.RequestException) as exc:
             last_error = exc
