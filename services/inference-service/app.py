@@ -46,13 +46,13 @@ MOVIES_SERVICE_URL = os.environ.get("MOVIES_SERVICE_URL", "http://movies-service
 
 # Ollama service
 MODEL_SERVER_URL = os.environ.get("MODEL_SERVER_URL")
-MODEL_NAME = os.environ.get("MODEL_NAME", "qwen2.5:1.5b")
+MODEL_NAME = os.environ.get("MODEL_NAME", "qwen2.5:0.5b")
 MAX_LLM_RETRIES = int(os.environ.get("MAX_LLM_RETRIES", 2))
+MAX_TOKENS = int(os.environ.get("MAX_TOKENS", 500))
 REQUEST_TIMEOUT = int(os.environ.get("REQUEST_TIMEOUT", 600))
 
 # Candidate retrieval settings
-CANDIDATE_LIMIT = int(os.environ.get("CANDIDATE_LIMIT", 30))
-CANDIDATE_MIN_RATING = float(os.environ.get("CANDIDATE_MIN_RATING", 7.0))
+CANDIDATE_LIMIT = int(os.environ.get("CANDIDATE_LIMIT", 15))
 
 # Security / Keycloak Configuration
 KEYCLOAK_JWKS_URL = os.environ.get("KEYCLOAK_JWKS_URL")
@@ -121,12 +121,9 @@ RECOMMENDATION_SCHEMA = {
             "type": "array",
             "items": {
                 "type": "object",
-                "required": ["title", "year", "genres", "reason", "confidence"],
+                "required": ["title", "confidence"],
                 "properties": {
                     "title": {"type": "string"},
-                    "year": {"type": "integer"},
-                    "genres": {"type": "array", "items": {"type": "string"}},
-                    "reason": {"type": "string"},
                     "confidence": {"type": "number", "minimum": 0, "maximum": 1},
                 },
             },
@@ -210,12 +207,18 @@ def filter_and_prune_candidates(candidates: list, profile: dict) -> list[dict]:
         except (ValueError, TypeError):
             year = None
 
+        synopsis = m.get("synopsis")
+        synopsis_clean = str(synopsis).strip() if synopsis is not None else ""
+
         seen_titles.add(title_lower)
-        pruned.append({
+        item = {
             "title": title_clean,
             "year": year,
             "genres": genre_items,
-        })
+        }
+        if synopsis_clean:
+            item["synopsis"] = synopsis_clean
+        pruned.append(item)
 
     return pruned
 
@@ -244,12 +247,7 @@ def fetch_candidate_movies(profile: dict, headers: dict | None = None) -> list[d
     except (ValueError, TypeError):
         min_year = None
 
-    params = {
-        "limit": CANDIDATE_LIMIT,
-        "sort_by": "rating",
-        "order": "desc",
-        "min_rating": CANDIDATE_MIN_RATING,
-    }
+    params = {}
     if fav_list:
         params["genres"] = ",".join(fav_list)
     if min_year is not None:
@@ -283,9 +281,9 @@ def build_prompt(profile: dict, candidates: list, user_message: str | None) -> s
     - Movie candidates
     - Optionally, a custom user message
     """
-    # Ensure candidates in prompt are strictly pruned to essential fields and bounded <= 30
+    # Ensure candidates in prompt are strictly pruned to essential fields and bounded <= CANDIDATE_LIMIT
     pruned_candidates = []
-    for m in (candidates or [])[:30]:
+    for m in (candidates or [])[:CANDIDATE_LIMIT]:
         if isinstance(m, dict):
             title_val = str(m.get("title") or "").strip()
             if not title_val:
@@ -305,14 +303,18 @@ def build_prompt(profile: dict, candidates: list, user_message: str | None) -> s
             else:
                 g_list = []
 
-            pruned_candidates.append({
+            cand = {
                 "title": title_val,
                 "year": year_val,
                 "genres": g_list,
-            })
+            }
+            syn_val = str(m.get("synopsis") or "").strip()
+            if syn_val:
+                cand["synopsis"] = syn_val
+            pruned_candidates.append(cand)
 
     candidate_block = (
-        json.dumps(pruned_candidates, indent=2)
+        json.dumps(pruned_candidates, separators=(",", ":"))
         if pruned_candidates
         else "(no catalog data available - use only well-known, real movies)"
     )
@@ -322,11 +324,11 @@ def build_prompt(profile: dict, candidates: list, user_message: str | None) -> s
 pool of candidate movies, select and rank the best matches based on the user's preferences.
 
 User profile:
-{json.dumps(profile, indent=2)}
+{json.dumps(profile, separators=(",", ":"))}
 
 Rules:
 1. You MUST select movies from the candidate list below. Do NOT suggest movies outside this list.
-2. Prioritize movies whose genres directly match the user's favorite genres. Movies matching favorite genres must be ranked highest with the highest confidence.
+2. Prioritize movies whose genres, synopsis, or themes best match the user's favorite genres and mood. Movies matching best must be ranked highest with the highest confidence.
 3. Do NOT recommend movies that the user has already watched.
 4. Set a realistic confidence score (between 0.1 and 1.0) reflecting how well each movie matches the profile.
 
@@ -341,15 +343,12 @@ no commentary before or after:
   "recommendations": [
     {{
       "title": "string",
-      "year": 0000,
-      "genres": ["string"],
-      "reason": "one sentence on why this matches the user's profile",
       "confidence": 0.0
     }}
   ]
 }}
 
-Return up to 8 recommendations."""
+Return up to 5 recommendations."""
 
 
 def call_llm(prompt: str) -> dict:
@@ -361,8 +360,16 @@ def call_llm(prompt: str) -> dict:
         json={
             "model": MODEL_NAME,
             "messages": [{"role": "user", "content": prompt}],
-            "response_format": {"type": "json_object"},
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "movie_recommendations",
+                    "strict": True,
+                    "schema": RECOMMENDATION_SCHEMA,
+                },
+            },
             "temperature": 0.2,
+            "max_tokens": MAX_TOKENS,
             "think": False,
         },
         timeout=REQUEST_TIMEOUT,
@@ -373,22 +380,159 @@ def call_llm(prompt: str) -> dict:
     return _parse_json(raw_text)
 
 
+def _repair_truncated_json(text: str) -> str:
+    """
+    Attempts to close unclosed brackets/braces in a truncated or malformed
+    JSON string by tracking delimiter state outside of string literals.
+    If truncation happened mid-item inside the recommendations array, rewinds
+    to the last complete item object before closing `]}`.
+    """
+    stack = []
+    in_string = False
+    escape = False
+    last_complete_item_end = None
+
+    for idx, ch in enumerate(text):
+        if escape:
+            escape = False
+            continue
+        if in_string:
+            if ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+
+        if ch == '"':
+            in_string = True
+        elif ch in ("{", "["):
+            stack.append(ch)
+        elif ch == "}":
+            if stack and stack[-1] == "{":
+                stack.pop()
+                # Just closed an object inside the root object's array: stack is ['{', '[']
+                if stack == ["{", "["]:
+                    last_complete_item_end = idx
+        elif ch == "]":
+            if stack and stack[-1] == "[":
+                stack.pop()
+
+    # 1. If we ended cleanly at the boundary of the root or array (not mid-item/mid-string),
+    #    close any remaining open delimiters directly.
+    if not in_string and stack in (["{"], ["{", "["]):
+        trimmed = text.rstrip().rstrip(",")
+        closing = "".join("}" if opener == "{" else "]" for opener in reversed(stack))
+        candidate = trimmed + closing
+        try:
+            json.loads(candidate)
+            return candidate
+        except json.JSONDecodeError:
+            pass
+
+    # 2. If truncated mid-object or mid-string inside the array, salvage up to the
+    #    last complete recommendation object and close with `]}`.
+    if last_complete_item_end is not None:
+        return text[: last_complete_item_end + 1] + "]}"
+
+    # 3. Fallback: close open string (if any) and all remaining open brackets/braces.
+    repaired = text.rstrip()
+    if in_string:
+        repaired += '"'
+    repaired = repaired.rstrip(",")
+    closing = "".join("}" if opener == "{" else "]" for opener in reversed(stack))
+    return repaired + closing
+
+
 def _parse_json(raw_text: str) -> dict:
     """
-    Removes unnecessary text commonly appended by the AI model:
-    - Spaces
-    - ```
+    Parses JSON from the LLM response, stripping markdown fences/preambles
+    and repairing unclosed brackets if generation was truncated.
     """
     cleaned = raw_text.strip()
+
+    # Strip markdown code fences safely without corrupting payload content
     if cleaned.startswith("```"):
-        cleaned = cleaned.strip("`")
-        cleaned = cleaned.replace("json\n", "", 1).replace("json", "", 1)
-    return json.loads(cleaned)
+        first_newline = cleaned.find("\n")
+        if first_newline != -1:
+            cleaned = cleaned[first_newline + 1 :]
+        else:
+            cleaned = cleaned.lstrip("`")
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+        cleaned = cleaned.strip()
+
+    # Jump to the first '{' in case the model emitted leading commentary
+    first_brace = cleaned.find("{")
+    if first_brace > 0:
+        cleaned = cleaned[first_brace:]
+
+    decoder = json.JSONDecoder()
+    try:
+        parsed, _ = decoder.raw_decode(cleaned)
+        return parsed
+    except json.JSONDecodeError:
+        repaired = _repair_truncated_json(cleaned)
+        parsed, _ = decoder.raw_decode(repaired)
+        return parsed
+
+
+def _enrich_recommendations(llm_recs: list[dict], candidates: list[dict]) -> list[dict]:
+    """
+    Populates catalog fields (year, genres, reason=synopsis) directly from the
+    candidate pool rather than relying on the LLM to reproduce them.
+    """
+    candidate_map = {}
+    for m in (candidates or []):
+        if isinstance(m, dict) and m.get("title"):
+            key = str(m["title"]).strip().lower()
+            if key and key not in candidate_map:
+                candidate_map[key] = m
+
+    enriched = []
+    seen = set()
+    for rec in (llm_recs or []):
+        raw_title = str(rec.get("title") or "").strip()
+        if not raw_title:
+            continue
+
+        key = raw_title.lower()
+        cand = candidate_map.get(key)
+        # Fallback if the LLM appended "(YYYY)" to the title
+        if cand is None and key.endswith(")") and "(" in key:
+            stripped_key = key[: key.rfind("(")].strip()
+            cand = candidate_map.get(stripped_key)
+            if cand is not None:
+                key = stripped_key
+
+        if key in seen:
+            continue
+
+        if cand is not None:
+            seen.add(key)
+            year_val = cand.get("year") if cand.get("year") is not None else cand.get("release_year")
+            enriched.append({
+                "title": cand.get("title") or raw_title,
+                "year": year_val,
+                "genres": cand.get("genres") or [],
+                "reason": cand.get("synopsis") or "",
+                "confidence": rec["confidence"],
+            })
+        elif not candidate_map:
+            seen.add(key)
+            enriched.append({
+                "title": raw_title,
+                "year": rec.get("year"),
+                "genres": rec.get("genres") or [],
+                "reason": rec.get("reason") or "",
+                "confidence": rec["confidence"],
+            })
+
+    return enriched
 
 
 def generate_recommendations(profile: dict, candidates: list, user_message: str | None = None) -> dict:
     """
-    Full pipeline: Prompt -> Call LLM -> Validate (with retries).
+    Full pipeline: Prompt -> Call LLM -> Validate (with retries) -> Enrich with catalog data.
     """
     prompt = build_prompt(profile, candidates, user_message)
 
@@ -397,7 +541,9 @@ def generate_recommendations(profile: dict, candidates: list, user_message: str 
         try:
             parsed = call_llm(prompt)
             validate(instance=parsed, schema=RECOMMENDATION_SCHEMA)
-            return parsed
+            return {
+                "recommendations": _enrich_recommendations(parsed["recommendations"], candidates)
+            }
         except (json.JSONDecodeError, ValidationError, KeyError, requests.RequestException) as exc:
             last_error = exc
             logger.warning("LLM attempt %d failed: %s", attempt, exc)

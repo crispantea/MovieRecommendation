@@ -1,6 +1,4 @@
-import { useProfile } from '../hooks/useProfile.js'
-
-export default function ProfileForm() {
+export default function ProfileForm({ profileState }) {
   const {
     ALLOWED_GENRES,
     loading, saving, error, success,
@@ -11,7 +9,7 @@ export default function ProfileForm() {
     newTitle, setNewTitle,
     newRating, setNewRating,
     saveProfile,
-  } = useProfile()
+  } = profileState
 
   if (loading) return <p>Loading profile...</p>
 

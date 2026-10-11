@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useRecommendations } from '../hooks/useRecommendations.js'
 
-export default function RecommendationsSection() {
+export default function RecommendationsSection({ favoriteGenres = [] }) {
   const { recommendations, loading, error, fetchRecommendations } = useRecommendations()
   const [message, setMessage] = useState('')
 
@@ -50,7 +50,12 @@ export default function RecommendationsSection() {
               </span>
             </div>
             <p style={{ margin: '4px 0', fontSize: 13, color: '#666' }}>
-              {rec.genres.join(', ')}
+              {rec.genres.map((genre, idx) => (
+                <span key={idx}>
+                  {idx > 0 && ', '}
+                  {favoriteGenres.includes(genre) ? <strong>{genre}</strong> : genre}
+                </span>
+              ))}
             </p>
             <p style={{ margin: 0 }}>{rec.reason}</p>
           </div>

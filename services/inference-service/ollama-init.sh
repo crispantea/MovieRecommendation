@@ -9,7 +9,7 @@ until ollama list >/dev/null 2>&1; do
 done
 
 # Pull the image (uses the server)
-ollama pull "${INFERENCE_OLLAMA_MODEL:-qwen2.5:1.5b}"
+ollama pull "${INFERENCE_OLLAMA_MODEL:-qwen2.5:0.5b}"
 
 # Avoid terminating the container
 wait
