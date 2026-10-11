@@ -3,8 +3,8 @@ import { getMyProfile, updateMyProfile } from '../api/profile.js'
 
 const ALLOWED_GENRES = [
   'sci-fi', 'thriller', 'mystery', 'drama', 'comedy', 'action',
-  'horror', 'romance', 'musical', 'documentary', 'animation',
-  'fantasy', 'crime', 'adventure', 'war', 'biography',
+  'horror', 'romance', 'music', 'documentary', 'animation',
+  'fantasy', 'crime', 'adventure', 'war', 'history', 'family', 'western',
 ]
 
 export function useProfile() {
@@ -25,7 +25,7 @@ export function useProfile() {
     getMyProfile()
       .then((data) => {
         setProfile(data)
-        setFavoriteGenres(data.favorite_genres || [])
+        setFavoriteGenres((data.favorite_genres || []).filter((g) => ALLOWED_GENRES.includes(g)))
         setFavoriteActors((data.favorite_actors || []).join(', '))
         setMood(data.mood || '')
         setWatchHistory(data.watch_history || [])

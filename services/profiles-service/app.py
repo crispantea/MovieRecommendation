@@ -75,8 +75,8 @@ def require_auth(f):
 # ================================================================================================ #
 ALLOWED_GENRES = [
     "sci-fi", "thriller", "mystery", "drama", "comedy", "action",
-    "horror", "romance", "musical", "documentary", "animation",
-    "fantasy", "crime", "adventure", "war", "biography",
+    "horror", "romance", "music", "documentary", "animation",
+    "fantasy", "crime", "adventure", "war", "history", "family", "western",
 ]
 
 PROFILE_UPDATE_SCHEMA = {

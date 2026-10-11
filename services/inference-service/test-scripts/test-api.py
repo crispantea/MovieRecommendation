@@ -16,7 +16,7 @@ TEST_PROFILE = {
     "user_id": "u_482",
     "favorite_genres": ["sci-fi", "thriller", "mystery"],
     "favorite_actors": ["Denis Villeneuve", "Amy Adams"],
-    "disliked_genres": ["romance", "musical"],
+    "disliked_genres": ["romance", "music"],
     "mood": "something tense and cerebral, not too long",
     "watch_history": [
         {"title": "Arrival", "rating": 5},
