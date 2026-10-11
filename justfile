@@ -236,7 +236,7 @@ kube-deploy-otel:
     --wait \
     -f -
 
-kube-deploy: kube-prepare kube-deploy-kgateway kube-deploy-keycloak kube-deploy-profiles-service kube-deploy-frontend kube-deploy-mimir kube-deploy-grafana kube-deploy-otel
+kube-deploy: kube-prepare kube-deploy-kgateway kube-deploy-keycloak kube-deploy-profiles-service kube-deploy-movies-service kube-deploy-inference-service kube-deploy-frontend kube-deploy-mimir kube-deploy-grafana kube-deploy-otel
 
 kube-clean-kgateway:
     helm uninstall kgateway -n ${KGATEWAY_NAMESPACE}
@@ -271,6 +271,8 @@ kube-clean-grafana:
 kube-clean-otel:
     helm uninstall opentelemetry-collector -n ${OTEL_NAMESPACE}
     kubectl delete ns ${OTEL_NAMESPACE} --wait
+
+kube-clean: kube-clean-monitoring kube-clean-grafana kube-clean-mimir kube-clean-frontend kube-clean-inference-service kube-clean-movies-service kube-clean-profiles-service kube-clean-keycloak kube-clean-kgateway
 
 kind-up: kind-init kube-deploy
 

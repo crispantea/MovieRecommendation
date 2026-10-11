@@ -77,6 +77,7 @@ services:
       PROFILES_SERVICE_URL: http://profiles-service:${PROFILES_CONTAINER_PORT}
       MOVIES_SERVICE_URL: http://movies-service:${MOVIES_CONTAINER_PORT}
       MODEL_SERVER_URL: http://inference-service-ollama:11434
+      MODEL_NAME: ${INFERENCE_OLLAMA_MODEL}
       KEYCLOAK_ISSUER: http://localhost:8080/realms/${KEYCLOAK_APP_REALM} # TODO: Why localhost???
       KEYCLOAK_JWKS_URL: http://auth-service:8080/realms/${KEYCLOAK_APP_REALM}/protocol/openid-connect/certs
       AUDIENCE: ${INFERENCE_AUDIENCE}
@@ -98,6 +99,8 @@ services:
   inference-service-ollama:
     image: ${INFERENCE_OLLAMA_IMAGE_REPO}:${INFERENCE_OLLAMA_IMAGE_TAG}
     container_name: inference-service-ollama
+    environment:
+      INFERENCE_OLLAMA_MODEL: ${INFERENCE_OLLAMA_MODEL}
     volumes:
       # - ollama_data:/root/.ollama
       - ./inference-service/ollama-init.sh:/ollama-init.sh
@@ -106,7 +109,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "ollama list | awk '{print $1}' | grep -qx 'llama3.2:1b'"
+          "ollama list | awk '{print $$1}' | grep -qx '${INFERENCE_OLLAMA_MODEL}'"
         ]
       interval: 30s
       timeout: 3s

@@ -46,7 +46,7 @@ MOVIES_SERVICE_URL = os.environ.get("MOVIES_SERVICE_URL", "http://movies-service
 
 # Ollama service
 MODEL_SERVER_URL = os.environ.get("MODEL_SERVER_URL")
-MODEL_NAME = os.environ.get("MODEL_NAME", "llama3.2:1b")
+MODEL_NAME = os.environ.get("MODEL_NAME", "qwen2.5:1.5b")
 MAX_LLM_RETRIES = int(os.environ.get("MAX_LLM_RETRIES", 2))
 REQUEST_TIMEOUT = int(os.environ.get("REQUEST_TIMEOUT", 600))
 
