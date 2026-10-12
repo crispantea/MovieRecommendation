@@ -53,29 +53,6 @@
     {
       "id": 3,
       "type": "timeseries",
-      "title": "Logins over time (per ~1 min)",
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "${ds}" },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 0,
-          "min": 0,
-          "custom": { "drawStyle": "bars", "fillOpacity": 80, "lineWidth": 1 }
-        },
-        "overrides": []
-      },
-      "options": { "legend": { "showLegend": false }, "tooltip": { "mode": "single" } },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum(increase(keycloak_credentials_password_hashing_validations_total{job=\"keycloak-scrapper\"}[$__rate_interval])) or vector(0)"
-        }
-      ]
-    },
-    {
-      "id": 4,
-      "type": "timeseries",
       "title": "HTTP requests per second",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
       "datasource": { "type": "prometheus", "uid": "${ds}" },
@@ -92,7 +69,7 @@
       ]
     },
     {
-      "id": 5,
+      "id": 4,
       "type": "timeseries",
       "title": "Average HTTP request latency",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },

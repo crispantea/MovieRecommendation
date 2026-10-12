@@ -9,6 +9,7 @@ resource "google_compute_instance" "worker" {
 
   boot_disk {
     initialize_params {
+      size = 20
       image = "ubuntu-os-cloud/ubuntu-2204-lts" # TODO: Check if we want to change this
     }
   }
