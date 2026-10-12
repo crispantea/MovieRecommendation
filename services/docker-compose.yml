@@ -133,6 +133,7 @@ services:
       KEYCLOAK_ISSUER: http://localhost:8080/realms/${KEYCLOAK_APP_REALM} # TODO: Why localhost???
       KEYCLOAK_JWKS_URL: http://auth-service:8080/realms/${KEYCLOAK_APP_REALM}/protocol/openid-connect/certs
       AUDIENCE: ${PROFILES_AUDIENCE}
+      CACHE_AGENT_URL: http://cache-agent:${CACHE_CONTAINER_PORT}
     ports:
       - "${PROFILES_HOST_PORT}:${PROFILES_CONTAINER_PORT}"
     healthcheck:
@@ -215,6 +216,35 @@ services:
 
 
   # ============================================================================================== #
+  # ========== Cache Agent Service =============================================================== #
+  # ============================================================================================== #
+  cache-agent:
+    image: agi-cache-agent
+    build:
+      context: ./cache-agent
+    container_name: cache-agent
+    environment:
+      PORT: ${CACHE_CONTAINER_PORT}
+      INFERENCE_URL: http://inference-service:${INFERENCE_CONTAINER_PORT}
+      REDIS_URL: redis://cache-agent-redis:6379/0
+      KEYCLOAK_ISSUER: http://localhost:${KEYCLOAK_HOST_PORT}/realms/${KEYCLOAK_APP_REALM}
+      KEYCLOAK_JWKS_URL: http://auth-service:8080/realms/${KEYCLOAK_APP_REALM}/protocol/openid-connect/certs
+      AUDIENCE: ${MOVIES_AUDIENCE}
+    ports:
+      - "${CACHE_HOST_PORT}:${CACHE_CONTAINER_PORT}"
+    depends_on:
+      - cache-agent-redis
+    restart: unless-stopped
+
+  cache-agent-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # TODO: REMOVE
+    ports:
+      - "6379:6379"
+
+
+  # ============================================================================================== #
   # ========== Frontend Service ================================================================== #
   # ============================================================================================== #
   frontend:
@@ -226,8 +256,10 @@ services:
       PORT: ${FRONTEND_CONTAINER_PORT}
       PROFILES_SERVICE_INTERNAL_URL: http://profiles-service:${PROFILES_CONTAINER_PORT}/profiles
       INFERENCE_SERVICE_INTERNAL_URL: http://inference-service:${INFERENCE_CONTAINER_PORT}
+      CACHE_AGENT_INTERNAL_URL: http://cache-agent:${CACHE_CONTAINER_PORT}
       PROFILES_SERVICE_URL: "http://${APP_DOMAIN}:${FRONTEND_HOST_PORT}/profiles"
       INFERENCE_SERVICE_URL: "http://${APP_DOMAIN}:${FRONTEND_HOST_PORT}/inference"
+      CACHE_AGENT_URL: "http://${APP_DOMAIN}:${FRONTEND_HOST_PORT}/cache"
       KEYCLOAK_URL: http://${APP_DOMAIN}:${KEYCLOAK_HOST_PORT}
       KEYCLOAK_APP_REALM: ${KEYCLOAK_APP_REALM}
       KEYCLOAK_APP_CLIENT_ID: ${KEYCLOAK_APP_CLIENT_ID}
