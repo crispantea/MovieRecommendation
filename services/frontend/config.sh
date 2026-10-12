@@ -7,7 +7,8 @@ window.__ENV__ = {
   KEYCLOAK_APP_REALM: "${KEYCLOAK_APP_REALM:-}",
   KEYCLOAK_APP_CLIENT_ID: "${KEYCLOAK_APP_CLIENT_ID:-}",
   PROFILES_SERVICE_URL: "${PROFILES_SERVICE_URL:-}",
-  INFERENCE_SERVICE_URL: "${INFERENCE_SERVICE_URL:-}"
+  INFERENCE_SERVICE_URL: "${INFERENCE_SERVICE_URL:-}",
+  CACHE_AGENT_URL: "${CACHE_AGENT_URL:-}"
 };
 EOF
 
@@ -41,6 +42,20 @@ EOF
 )
 fi
 
+CACHE_BLOCK=""
+if [ -n "${CACHE_AGENT_INTERNAL_URL:-}" ]; then
+  CACHE_BLOCK=$(cat <<EOF
+
+  location /cache/ {
+    proxy_pass ${CACHE_AGENT_INTERNAL_URL}/;
+    proxy_set_header Host \$proxy_host;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+  }
+EOF
+)
+fi
+
 cat <<EOF > /etc/nginx/conf.d/default.conf
 server {
   listen ${PORT:-80};
@@ -53,6 +68,7 @@ server {
   }
 ${INFERENCE_BLOCK}
 ${PROFILES_BLOCK}
+${CACHE_BLOCK}
 
   # SPA Routing fallback
   location / {

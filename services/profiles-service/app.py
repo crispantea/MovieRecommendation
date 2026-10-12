@@ -1,9 +1,11 @@
+import json
 import os
 import logging
 from functools import wraps
 
 import jwt
 from jwt import PyJWKClient
+import urllib
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
@@ -23,13 +25,16 @@ db = SQLAlchemy(app)
 
 # Keycloak JWT verification configuration from environment
 JWKS_URL = os.environ.get('KEYCLOAK_JWKS_URL')
+if not JWKS_URL:
+    raise RuntimeError("CRITICAL: KEYCLOAK_JWKS_URL environment variable is required.")
+jwk_client = PyJWKClient(JWKS_URL)
+
 KEYCLOAK_ISSUER = os.environ.get('KEYCLOAK_ISSUER')
 AUDIENCE = os.environ.get('AUDIENCE')
 
-if not JWKS_URL:
-    raise RuntimeError("CRITICAL: KEYCLOAK_JWKS_URL environment variable is required.")
+# Cache agent
+CACHE_AGENT_URL = os.environ.get('CACHE_AGENT_URL')
 
-jwk_client = PyJWKClient(JWKS_URL)
 
 def require_auth(f):
     @wraps(f)
@@ -143,6 +148,22 @@ class Profile(db.Model):
 
 
 # ================================================================================================ #
+# ========== Helpers ============================================================================= #
+# ================================================================================================ #
+def notify_cache_agent(user_id: str):
+    """
+    Notifies cache agent (best effort)
+    """
+    url = f"{CACHE_AGENT_URL}/events/{user_id}/profile-updated"
+    req = urllib.request.Request(url, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=3):
+            return
+    except Exception:
+        logger.exception("Failed to notify cache agent for user %s", user_id)
+
+
+# ================================================================================================ #
 # ========== Routes ============================================================================== #
 # ================================================================================================ #
 @app.route("/health", methods=["GET"])
@@ -161,9 +182,13 @@ def get_my_profile():
 
     profile = db.session.get(Profile, user_id)
     if not profile:
+        # Create new profile
         profile = Profile(user_id=user_id)
         db.session.add(profile)
         db.session.commit()
+
+        # Notify cache agent (best effort)
+        notify_cache_agent(profile.user_id)
 
     return jsonify(profile.to_dict()), 200
 
@@ -195,6 +220,21 @@ def update_my_profile():
             setattr(profile, field, body[field])
 
     db.session.commit()
+
+    # Notify cache agent (best effort)
+    notify_cache_agent(user_id)
+
+    return jsonify(profile.to_dict()), 200
+
+
+@app.route("/profiles/user/<user_id>", methods=["GET"])
+def get_user_profile(user_id):
+    """
+    Returns the requested user profile.
+    """
+    profile = db.session.get(Profile, user_id)
+    if not profile:
+        return jsonify({"error": "Profile not found!"}), 404
 
     return jsonify(profile.to_dict()), 200
 

@@ -589,40 +589,54 @@ def generate():
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }), 200
 
+@app.route("/recommendations/generate/<user_id>", methods=["POST"])
+def generate_for_user(user_id):
+    """
+    Synchronous, user-facing endpoint.
+    Expects optional: { "message": "optional free text" }
+    (candidates in request body is optional; if omitted, fetched internally from movies-service)
+    """
+    body = request.get_json(silent=True) or {}
+    message = body.get("message")
 
-# @app.route("/internal/recommendations/batch", methods=["POST"])
-# def generate_batch():
-#     """
-#     Internal-only endpoint used by the Background Agent service to
-#     pre-generate recommendations for many users at once.
-#     Expects: { "users": [ { "user_id": "...", "profile": {...} }, ... ] }
-#     Not intended to be exposed through the public API gateway.
-#     """
-#     body = request.get_json(silent=True) or {}
-#     users = body.get("users", [])
+    # Fetch profile from profiles-service
+    try:
+        resp = requests.get(f"{PROFILES_SERVICE_URL}/profiles/user/{user_id}", timeout=10)
+        resp.raise_for_status()
+        profile = resp.json()
+    except requests.RequestException as exc:
+        logger.error("Failed to fetch user profile: %s", exc)
+        return jsonify({"error": "failed to fetch user profile"}), 502
 
-#     if not users:
-#         return jsonify({"error": "users list is required"}), 400
+    # If client passed non-empty candidates (e.g. tests or external caller), use them after filtering/pruning;
+    # otherwise query movies-service internally
+    client_candidates = body.get("candidates")
+    if client_candidates and isinstance(client_candidates, list) and len(client_candidates) > 0:
+        candidates = filter_and_prune_candidates(client_candidates, profile)[:CANDIDATE_LIMIT]
+    else:
+        candidates = fetch_candidate_movies(profile)
 
-#     results = []
-#     for entry in users:
-#         user_id = entry.get("user_id")
-#         profile = entry.get("profile")
-#         if not user_id or not profile:
-#             results.append({"user_id": user_id, "error": "missing profile"})
-#             continue
-#         try:
-#             result = generate_recommendations(profile, candidates=[])
-#             results.append({
-#                 "user_id": user_id,
-#                 "recommendations": result["recommendations"],
-#                 "generated_at": datetime.now(timezone.utc).isoformat(),
-#             })
-#         except RuntimeError as exc:
-#             logger.error("Batch generation failed for user %s: %s", user_id, exc)
-#             results.append({"user_id": user_id, "error": "generation failed"})
+    if not DISABLE_INFERENCE_SERVICE_METRICS:
+        start = time.perf_counter()
+        status = "success"
+    try:
+        result = generate_recommendations(profile, candidates, message)
+    except RuntimeError as exc:
+        if not DISABLE_INFERENCE_SERVICE_METRICS:
+            status = "error"
+        logger.error("Generation failed: %s", exc)
+        return jsonify({"error": "recommendation generation failed"}), 502
+    finally:
+        if not DISABLE_INFERENCE_SERVICE_METRICS:
+            llm_duration.record(
+                time.perf_counter() - start,
+                {"status": status},
+            )
 
-#     return jsonify({"results": results}), 200
+    return jsonify({
+        "recommendations": result["recommendations"],
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }), 200
 
 
 if __name__ == "__main__":
