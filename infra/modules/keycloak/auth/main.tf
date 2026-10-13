@@ -85,7 +85,7 @@ resource "keycloak_generic_role_mapper" "web_roles" {
 # Audience: each service checks that its own name is in `aud`
 resource "keycloak_openid_audience_protocol_mapper" "audiences" {
   # TODO: If more services will read the users token, add it here!
-  for_each = toset(["profiles-api", "inference-api", "movies-api"])
+  for_each = toset(["profiles-api", "inference-api", "movies-api", "cache-api"])
 
   realm_id  = keycloak_realm.agi_project.id
   client_id = keycloak_openid_client.agi_web.id

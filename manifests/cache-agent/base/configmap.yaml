@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${CACHE_SERVICE_NAME}
+data:
+  # TODO: Find a workaround to use "${CACHE_CONTAINER_PORT}", it doesnt work here because of how
+  # envsubst acts on the var, it substitues de values but parses the PORT to a number instead of a string
+  PORT: "3002"
+  INFERENCE_URL: "http://${INFERENCE_SERVICE_NAME}.${INFERENCE_NAMESPACE}.svc:${INFERENCE_SERVICE_PORT}"
+  REDIS_URL: "redis://${CACHE_REDIS_SERVICE_NAME}-master:6379/0"
+  KEYCLOAK_ISSUER: "${KEYCLOAK_ISSUER}"
+  KEYCLOAK_JWKS_URL: "http://${KEYCLOAK_SERVICE_NAME}.${KEYCLOAK_NAMESPACE}.svc:${KEYCLOAK_SERVICE_PORT}${KEYCLOAK_PATH}/realms/${KEYCLOAK_APP_REALM}/protocol/openid-connect/certs"
+  AUDIENCE: ${CACHE_AUDIENCE}

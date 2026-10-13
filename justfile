@@ -102,6 +102,7 @@ kind-init:
     # kind load docker-image ${INFERENCE_OLLAMA_IMAGE_REPO}:${INFERENCE_OLLAMA_IMAGE_TAG} --name={{cluster_name}}
     kind load docker-image ${FRONTEND_IMAGE}:latest --name={{cluster_name}}
     kind load docker-image ${INFERENCE_SERVICE_IMAGE}:latest --name={{cluster_name}}
+    kind load docker-image ${CACHE_SERVICE_IMAGE}:latest --name={{cluster_name}}
 
 kube-prepare:
     # ---- Add required Helm repos  ----
@@ -200,6 +201,26 @@ kube-deploy-inference-service:
     export KEYCLOAK_ISSUER="http://${APP_DOMAIN}${PORT_SUFFIX}${KEYCLOAK_PATH}/realms/${KEYCLOAK_APP_REALM}" && \
     kubectl kustomize "{{manifests_dir}}/inference-service/overlays/$ENV" | envsubst | kubectl apply -f - --wait
 
+kube-deploy-cache-agent:
+    # Build and deploy the cache-agent wrapper
+    helm dependency build "{{manifests_dir}}/cache-agent/redis"
+    set -a; source {{secrets_env_file}}; set +a && \
+    envsubst < "{{manifests_dir}}/cache-agent/redis/values.yaml" | \
+    helm upgrade --install redis "{{manifests_dir}}/cache-agent/redis" \
+    -n ${CACHE_NAMESPACE} \
+    --create-namespace \
+    --wait \
+    -f -
+
+    set -a; source {{secrets_env_file}}; set +a && \
+    if [ "${KEYCLOAK_HOST_PORT}" = "80" ] || [ "${KEYCLOAK_HOST_PORT}" = "443" ] || [ -z "${KEYCLOAK_HOST_PORT}" ]; then \
+        PORT_SUFFIX="" ; \
+    else \
+        PORT_SUFFIX=":${KEYCLOAK_HOST_PORT}" ; \
+    fi && \
+    export KEYCLOAK_ISSUER="http://${APP_DOMAIN}${PORT_SUFFIX}${KEYCLOAK_PATH}/realms/${KEYCLOAK_APP_REALM}" && \
+    kubectl kustomize "{{manifests_dir}}/cache-agent/overlays/$ENV" | envsubst | kubectl apply -f - --wait
+
 kube-deploy-frontend:
     kubectl kustomize "{{manifests_dir}}/frontend/overlays/$ENV" | envsubst | kubectl apply -f - --wait
 
@@ -236,7 +257,7 @@ kube-deploy-otel:
     --wait \
     -f -
 
-kube-deploy: kube-prepare kube-deploy-kgateway kube-deploy-keycloak kube-deploy-profiles-service kube-deploy-movies-service kube-deploy-inference-service kube-deploy-frontend kube-deploy-mimir kube-deploy-grafana kube-deploy-otel
+kube-deploy: kube-prepare kube-deploy-kgateway kube-deploy-keycloak kube-deploy-profiles-service kube-deploy-movies-service kube-deploy-inference-service kube-deploy-cache-agent kube-deploy-frontend kube-deploy-mimir kube-deploy-grafana kube-deploy-otel
 
 kube-clean-kgateway:
     helm uninstall kgateway -n ${KGATEWAY_NAMESPACE}
@@ -256,6 +277,10 @@ kube-clean-movies-service:
 
 kube-clean-inference-service:
     helm delete ollama -n ${INFERENCE_NAMESPACE} --wait
+
+kube-clean-cache-agent:
+    helm uninstall redis -n ${CACHE_NAMESPACE}
+    kubectl kustomize "{{manifests_dir}}/cache-agent/overlays/$ENV" | envsubst | kubectl delete -f - --wait
 
 kube-clean-frontend:
     kubectl kustomize "{{manifests_dir}}/frontend/overlays/$ENV" | envsubst | kubectl delete -f - --wait

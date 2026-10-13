@@ -8,6 +8,7 @@
       - agi-inference-service:latest
       - agi-movies-service:latest
       - agi-profiles-service:latest
+      - agi-cache-agent
   tasks:
     - name: export images to a compressed archive
       shell: |
@@ -19,7 +20,7 @@
 - hosts: all
   gather_facts: no
   vars:
-    expected_images: 4
+    expected_images: 5
   tasks:
     - name: count agi images already on the node
       become: yes
