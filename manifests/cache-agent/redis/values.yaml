@@ -1,0 +1,19 @@
+redis:
+  fullnameOverride: ${CACHE_REDIS_SERVICE_NAME}
+  architecture: standalone
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: ${PERSISTENCE_ENABLED}
+      accessModes:
+        - ReadWriteOnce
+      storageClass: "gcp-pd-retain"
+      volumeName: "cache-agent-redis"
+      existingClaim: "cache-agent-redis-pvc"
+      size: 1Gi
+
+
+
+additional_values:
+  volume_handle: ${CACHE_VOLUME_HANDLE}

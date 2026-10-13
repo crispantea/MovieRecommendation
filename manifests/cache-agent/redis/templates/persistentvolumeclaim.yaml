@@ -1,0 +1,14 @@
+{{- if .Values.redis.master.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cache-agent-redis-pvc
+spec:
+  resources:
+    requests:
+      storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gcp-pd-retain
+  volumeName: cache-agent-redis
+{{- end }}

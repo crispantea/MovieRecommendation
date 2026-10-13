@@ -219,7 +219,7 @@ services:
   # ========== Cache Agent Service =============================================================== #
   # ============================================================================================== #
   cache-agent:
-    image: agi-cache-agent
+    image: ${CACHE_SERVICE_IMAGE}
     build:
       context: ./cache-agent
     container_name: cache-agent
@@ -229,7 +229,7 @@ services:
       REDIS_URL: redis://cache-agent-redis:6379/0
       KEYCLOAK_ISSUER: http://localhost:${KEYCLOAK_HOST_PORT}/realms/${KEYCLOAK_APP_REALM}
       KEYCLOAK_JWKS_URL: http://auth-service:8080/realms/${KEYCLOAK_APP_REALM}/protocol/openid-connect/certs
-      AUDIENCE: ${MOVIES_AUDIENCE}
+      AUDIENCE: ${CACHE_AUDIENCE}
     ports:
       - "${CACHE_HOST_PORT}:${CACHE_CONTAINER_PORT}"
     depends_on:

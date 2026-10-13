@@ -14,6 +14,11 @@ module "storage" {
       size = 10
       type = "ssd"
     }
+
+    cache = {
+      size = 1
+      type = "ssd"
+    }
   }
 }
 

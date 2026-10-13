@@ -4,19 +4,7 @@ Microservices movie recommendation platform with OIDC auth, LLM inference, and K
 
 ## Architecture
 
-```mermaid
-flowchart TD
-    U(["Browser"]) --> GW["KGateway / Nginx"]
-    GW -->|"/"| FE["frontend"]
-    GW -->|"/auth"| KC["keycloak (+ DB)"]
-    GW -->|"/profiles"| PS["profiles-service (+ DB)"]
-    GW -->|"/inference"| IS["inference-service"]
-    GW -->|"/dashboard"| GF["grafana"]
-
-    IS --> PS & MS["movies-service (+ DB)"] & OL["ollama (qwen2.5:0.5b)"]
-    OT["otel-collector"] --> KC & MM["mimir"]
-    GF --> MM
-```
+![Architecture diagram](static/architecture.drawio.png)
 
 | Service | Stack | Port / Path | Role |
 | :--- | :--- | :--- | :--- |
