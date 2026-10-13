@@ -1,53 +1,23 @@
-# Frontend Application
+# Frontend
 
-The frontend consists of a React + Vite application that talks to the Flask backend (API).
+React/Vite application for authentication, profiles, and movie recommendations.
 
-## Setup
+## Local Development
 
-1. Install dependencies
-    ```bash
-    npm install
-    ```
+Set these values in `.env`. Vite loads this file automatically:
 
-2. Set the necessary environment variables (reference: [`.env.example`](.env.example)) and export it:
-    ```bash
-    set -a
-    source .env
-    set +a
-    ```
-
-3. Start the dev server
-    ```bash
-    npm run dev
-    ```
-
-## Configuration
-
-The backend URL is set in `src/api/auth.js`:
-```js
-const API_URL = 'http://localhost:3000'
+```dotenv
+VITE_PROFILES_SERVICE_URL=http://localhost:3000
+VITE_INFERENCE_SERVICE_URL=http://localhost:8000
+VITE_KEYCLOAK_URL=http://localhost:8080
+VITE_KEYCLOAK_APP_REALM=agi-project
+VITE_KEYCLOAK_APP_CLIENT_ID=agi-web
 ```
 
-## Project Structure
+The services must already be running; see [repository setup](../../README.md) for the complete stack setup.
 
-```
-├── eslint.config.js    # Linting rules
-├── index.html          # HTML entry point, loads main.jsx
-├── node_modules        # Installed dependencies
-│   ├── ...
-├── package.json        # Project metadata, scripts, dependencies
-├── package-lock.json   # Locked dependency versions
-├── public              # Static assets served as-is
-│   ├── ...
-├── README.md           # Project documentation
-├── src
-│   ├── api             # Backend request functions
-│   │   └── ...
-│   ├── components      # Reusable UI components
-│   │   └── ...
-│   ├── hooks           # Custom React hooks (state/logic)
-│   │   └── ...
-│   ├── App.jsx         # Root component
-│   └── main.jsx        # React entry point, mounts App to the DOM
-└── vite.config.js      # Vite configuration
+```bash
+cp .env.example .env
+npm ci
+npm run dev
 ```

@@ -1,27 +1,20 @@
-# Movies Service Application
+# Movies Service
 
-A Flask API for managing movies in this project.
+Flask API for the movie catalog. For a complete local stack, follow the [repository setup](../../README.md).
 
-## Setup
+## Run Standalone
 
-1. Create a virtual environment
-    ```bash
-    python3 -m venv venv
-    ```
-
-2. Activate it
-    ```bash
-    # macOS/Linux
-    source venv/bin/activate
-    ```
-
-3. Install dependencies
-    ```bash
-    pip3 install -r requirements.txt
-    ```
-
-## Run
+The service listens on port `3001`, uses SQLite (`movies.db`) by default, and seeds an empty catalog from `data/movies.csv.gz` at startup. To use PostgreSQL, set `DATABASE_URL` before running:
 
 ```bash
-python3 app.py
+export DATABASE_URL='postgresql://USER:PASSWORD@localhost:5432/DATABASE'
+```
+
+Install and run:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python app.py
 ```

@@ -15,24 +15,22 @@ The image is based on Ubuntu and includes:
 * Ansible
 * Google Cloud CLI
 * kubectl
+* Docker CLI
 * SSH
 * Python 3
 * Graphviz
 
-## Build
-
-```bash
-docker build -t mgmt .
-```
-
 ## Run
 
+From the repository root, after initializing configuration:
+
 ```bash
-docker run -d --name mgmt mgmt
+ENV=cloud just mgmt-up
+docker exec -it -w /root/agi-project mgmt bash
 ```
 
-To access the container:
+`mgmt-up` builds and starts the container with the project directory and Docker socket mounted. Stop it with:
 
 ```bash
-docker exec -it mgmt bash
+ENV=cloud just mgmt-down
 ```

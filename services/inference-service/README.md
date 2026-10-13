@@ -1,27 +1,27 @@
-# Inference Service Application
+# Inference Service
 
-A Flask API for interacting with the AI inference model.
+Flask API that generates recommendations using Ollama. For a complete local stack, follow the [repository setup](../../README.md).
 
-## Setup
+## Run Standalone
 
-1. Create a virtual environment
-    ```bash
-    python3 -m venv venv
-    ```
-
-2. Activate it
-    ```bash
-    # macOS/Linux
-    source venv/bin/activate
-    ```
-
-3. Install dependencies
-    ```bash
-    pip3 install -r requirements.txt
-    ```
-
-## Run
+Requires running profiles and movies APIs, Keycloak, and Ollama with the configured model available. Set these values for your environment:
 
 ```bash
-python3 app.py
+export PORT=8000
+export PROFILES_SERVICE_URL=http://localhost:3000
+export MOVIES_SERVICE_URL=http://localhost:3001
+export MODEL_SERVER_URL=http://localhost:11434
+export MODEL_NAME=qwen2.5:0.5b
+export KEYCLOAK_JWKS_URL=http://localhost:8080/realms/agi-project/protocol/openid-connect/certs
+export KEYCLOAK_ISSUER=http://localhost:8080/realms/agi-project
+export AUDIENCE=inference-api
+```
+
+Install the model with `ollama pull qwen2.5:0.5b`, then install and run the service:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python app.py
 ```
