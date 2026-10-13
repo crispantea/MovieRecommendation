@@ -4,6 +4,8 @@ A movie recommendation application built from microservices. Users sign in with 
 
 ## Components
 
+![Architecture diagram](static/architecture.drawio.png)
+
 - **Frontend:** React application for sign-in, profiles, and recommendations.
 - **Keycloak:** OpenID Connect authentication, backed by PostgreSQL.
 - **Profiles service:** Flask API and PostgreSQL database for user profiles and watch history.
