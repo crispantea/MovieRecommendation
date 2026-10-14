@@ -14,17 +14,15 @@ import requests
 # ================================================================================================ #
 TEST_PROFILE = {
     "user_id": "u_482",
+    "favorite_movie": "Arrival",
     "favorite_genres": ["sci-fi", "thriller", "mystery"],
     "favorite_actors": ["Denis Villeneuve", "Amy Adams"],
-    "disliked_genres": ["romance", "music"],
-    "mood": "something tense and cerebral, not too long",
     "watch_history": [
         {"title": "Arrival", "rating": 5},
         {"title": "Prisoners", "rating": 4},
         {"title": "Sicario", "rating": 5},
         {"title": "The Notebook", "rating": 2}
-    ],
-    "min_year": 2000
+    ]
 }
 
 

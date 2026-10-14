@@ -1,4 +1,5 @@
 import { api } from './client'
+import { getCacheRecommendations } from './cache.js'
 
 const env = window.__ENV__ ?? {}
 
@@ -10,3 +11,11 @@ export const getRecommendations = (message = null) =>
     method: 'POST',
     body: message ? { message } : {},
   })
+
+export async function getCachedRecommendations() {
+  const data = await getCacheRecommendations()
+  return {
+    recommendations: Array.isArray(data?.recommendations) ? data.recommendations : [],
+    source: data?.source ?? 'cache',
+  }
+}

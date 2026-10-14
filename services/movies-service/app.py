@@ -1,19 +1,21 @@
 import os
-import re
 import time
 
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import cast, and_, or_, func, case, select
+from sqlalchemy import cast, and_, or_, func, case
 
 import seed_db
 
 app = Flask(__name__)
+CORS(app)
 PORT = int(os.environ.get("PORT", 3001))
 
 # Database configuration
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///movies.db")
 db = SQLAlchemy(app)
+
 
 # ================================================================================================ #
 # ========== Model =============================================================================== #
@@ -52,94 +54,109 @@ class Movie(db.Model):
             "imdb_id": self.imdb_id,
         }
 
-# ================================================================================================ #
-# ========== Routes ============================================================================== #
-# ================================================================================================ #
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok"}), 200
 
 
-@app.route("/movies", methods=["GET"])
+@app.route("/movies", methods=["GET", "POST"])
 def list_movies():
     """
     Returns top movie matches.
     Filters by favorite genres and release year if provided,
-    and ranks by actor/mood keyword matches first, then by rating and popularity.
+    removes watched titles from the candidate list,
+    and ranks by actor and genre matches, then by rating and popularity.
     """
-    query = db.session.query(Movie)
+    base_query = db.session.query(Movie)
 
-    # 1. Filter by genres if requested
-    # Note: Using `and_` ensures movies must match ALL requested genres (e.g., both Sci-Fi AND Horror)
-    # rather than `or_` which would match movies containing any single genre from the list.
-    genres = request.args.get("genres") or request.args.get("genre")
-    if genres:
-        terms = [g.strip() for g in genres.split(",") if g.strip()]
-        if terms:
-            query = query.filter(and_(*(cast(Movie.genres, db.String).ilike(f"%{t}%") for t in terms)))
+    body = request.get_json(silent=True) or {}
 
-    # 2. Filter by minimum release year if requested
-    min_year = request.args.get("min_year")
+    min_year = request.args.get("min_year") or body.get("min_year")
     if min_year:
         try:
-            query = query.filter(Movie.release_year >= int(min_year))
+            base_query = base_query.filter(Movie.release_year >= int(min_year))
         except ValueError:
             pass
 
-    # 3. Soft relevance score from favorite_actors and mood
-    match_conditions = []
+    # Exclude watched movies and favorite movie from candidate pool
+    raw_watched = request.args.getlist("watched") or request.args.getlist("exclude") or body.get("watched", [])
+    if isinstance(raw_watched, str):
+        raw_watched = raw_watched.split(",")
 
-    actors = request.args.get("actors")
-    if actors:
-        for actor in (a.strip() for a in actors.split(",") if a.strip()):
-            match_conditions.append(
-                or_(
-                    cast(Movie.cast, db.String).ilike(f"%{actor}%"),
-                    Movie.director.ilike(f"%{actor}%"),
-                )
+    exclude_list = []
+    for item in raw_watched:
+        if isinstance(item, str):
+            exclude_list.extend([t.strip() for t in item.split(",") if t.strip()])
+
+    fav_movie = request.args.get("favorite_movie") or body.get("favorite_movie")
+    if fav_movie:
+        exclude_list.append(str(fav_movie).strip())
+
+    if exclude_list:
+        watched_set = {w.lower() for w in exclude_list if w}
+        base_query = base_query.filter(func.lower(Movie.title).notin_(list(watched_set)))
+
+    # 1. Parse genres (broad matching, never strict exclusion across multiple genres)
+    genre_conditions = []
+    genres = request.args.get("genres") or request.args.get("genre") or body.get("genres")
+    if genres:
+        terms = [g.strip() for g in genres.split(",") if g.strip()]
+        for t in terms:
+            genre_conditions.append(cast(Movie.genres, db.String).ilike(f"%{t}%"))
+
+    # 2. Parse favorite actors (additive matching, direct substring)
+    actor_conditions = []
+    actors = request.args.get("actors") or body.get("actors")
+    if isinstance(actors, list):
+        actor_list = [str(a).strip() for a in actors if str(a).strip()]
+    elif isinstance(actors, str):
+        actor_list = [a.strip() for a in actors.split(",") if a.strip()]
+    else:
+        actor_list = []
+
+    for actor in actor_list:
+        actor_conditions.append(
+            or_(
+                cast(Movie.cast, db.String).ilike(f"%{actor}%"),
+                Movie.director.ilike(f"%{actor}%"),
             )
+        )
 
-    mood = request.args.get("mood")
-    if mood:
-        raw_words = [w for w in re.findall(r"[a-z0-9]+", mood.lower()) if len(w) > 2]
-        if raw_words:
-            # Check each word against PostgreSQL's built-in 'english' dictionary:
-            # stopwords ("the", "and", "with", etc.) evaluate to an empty tsquery (""),
-            # while meaningful words evaluate to a non-empty tsquery.
-            row = db.session.execute(
-                select(*(cast(func.plainto_tsquery("english", w), db.String) for w in raw_words))
-            ).first()
-            for word, tsq in zip(raw_words, row or []):
-                if tsq:
-                    match_conditions.append(
-                        or_(
-                            Movie.title.ilike(f"%{word}%"),
-                            Movie.synopsis.ilike(f"%{word}%"),
-                        )
-                    )
-
-    # 4. Weighted quality sort: rating * ln(vote_count + 2)
+    # 3. Weighted quality sort: rating * ln(vote_count + 2)
     weighted_score = Movie.rating * func.log(func.coalesce(Movie.vote_count, 0) + 2)
 
+    limit = int(request.args.get("limit") or body.get("limit") or 100)
+    limit = max(10, min(limit, 200))
+
     movies = []
-    if match_conditions:
-        match_score = sum(case((cond, 1), else_=0) for cond in match_conditions)
+    all_match_conditions = actor_conditions + genre_conditions
+    if all_match_conditions:
+        # Prioritize exact genre matches (5 pts each) and favorite actor presence (4 pts)
+        score_terms = []
+        for cond in actor_conditions:
+            score_terms.append(case((cond, 4), else_=0))
+        for cond in genre_conditions:
+            score_terms.append(case((cond, 5), else_=0))
+        # Exact multi-genre intersection bonus: if movie matches ALL favorite genres, give massive boost
+        if len(genre_conditions) > 1:
+            score_terms.append(case((and_(*genre_conditions), 15), else_=0))
+        match_score = sum(score_terms)
         movies = (
-            query.filter(or_(*match_conditions))
+            base_query.filter(or_(*all_match_conditions))
             .order_by(match_score.desc(), weighted_score.desc().nulls_last())
-            .limit(50)
+            .limit(limit)
             .all()
         )
 
-    # 5. Fill remaining slots (or all 50 if no actor/mood matches) by weighted quality
-    if len(movies) < 50:
+    # 4. Fill remaining candidate slots by weighted quality
+    if len(movies) < limit:
         existing_ids = [m.id for m in movies]
-        fallback_query = query
+        fallback_query = base_query
         if existing_ids:
             fallback_query = fallback_query.filter(Movie.id.notin_(existing_ids))
         fallback_movies = (
             fallback_query.order_by(weighted_score.desc().nulls_last())
-            .limit(50 - len(movies))
+            .limit(limit - len(movies))
             .all()
         )
         movies.extend(fallback_movies)

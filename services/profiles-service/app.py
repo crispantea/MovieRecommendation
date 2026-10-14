@@ -17,7 +17,7 @@ logger = logging.getLogger("profiles-service")
 app = Flask(__name__)
 CORS(app)  # allows requests from your Vite dev server (localhost:5173)
 
-PORT = int(os.environ.get('PORT'))
+PORT = int(os.environ.get('PORT', 3000))
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -62,6 +62,7 @@ def require_auth(f):
 
             payload = jwt.decode(**kwargs_jwt)
             request.user_id = payload.get("sub")
+            request.user_claims = payload
 
             if not request.user_id:
                 return jsonify({"error": "Unauthorized: Token missing sub claim"}), 401
@@ -73,6 +74,19 @@ def require_auth(f):
         return f(*args, **kwargs)
 
     return decorated
+
+
+def extract_user_identity(claims: dict):
+    if not isinstance(claims, dict):
+        return "", ""
+    name = (
+        claims.get("name")
+        or f"{claims.get('given_name', '')} {claims.get('family_name', '')}".strip()
+        or claims.get("preferred_username")
+        or ""
+    )
+    email = claims.get("email") or ""
+    return name, email
 
 
 # ================================================================================================ #
@@ -88,6 +102,8 @@ PROFILE_UPDATE_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
     "properties": {
+        "name": {"type": "string", "maxLength": 255},
+        "email": {"type": "string", "maxLength": 255},
         "favorite_genres": {
             "type": "array",
             "items": {"type": "string", "enum": ALLOWED_GENRES},
@@ -96,11 +112,6 @@ PROFILE_UPDATE_SCHEMA = {
             "type": "array",
             "items": {"type": "string", "minLength": 1},
         },
-        "disliked_genres": {
-            "type": "array",
-            "items": {"type": "string", "enum": ALLOWED_GENRES},
-        },
-        "mood": {"type": "string", "maxLength": 280},
         "watch_history": {
             "type": "array",
             "items": {
@@ -113,8 +124,7 @@ PROFILE_UPDATE_SCHEMA = {
                 },
             },
         },
-        "min_year": {"type": "integer", "minimum": 1900, "maximum": 2100},
-        "visibility": {"type": "string", "enum": ["public", "private"]},
+        "favorite_movie": {"type": "string", "maxLength": 255},
     },
 }
 
@@ -126,24 +136,22 @@ class Profile(db.Model):
     __tablename__ = "profiles"
 
     user_id = db.Column(db.String(128), primary_key=True)
+    name = db.Column(db.String(255), default="")
+    email = db.Column(db.String(255), default="")
+    favorite_movie = db.Column(db.String(255), default="")
     favorite_genres = db.Column(db.JSON, default=list)
     favorite_actors = db.Column(db.JSON, default=list)
-    disliked_genres = db.Column(db.JSON, default=list)
-    mood = db.Column(db.String, default="")
     watch_history = db.Column(db.JSON, default=list)
-    min_year = db.Column(db.Integer, nullable=True)
-    visibility = db.Column(db.String, default="public")
 
     def to_dict(self):
         return {
             "user_id": self.user_id,
-            "favorite_genres": self.favorite_genres,
-            "favorite_actors": self.favorite_actors,
-            "disliked_genres": self.disliked_genres,
-            "mood": self.mood,
-            "watch_history": self.watch_history,
-            "min_year": self.min_year,
-            "visibility": self.visibility,
+            "name": self.name or "",
+            "email": self.email or "",
+            "favorite_movie": self.favorite_movie or "",
+            "favorite_genres": self.favorite_genres or [],
+            "favorite_actors": self.favorite_actors or [],
+            "watch_history": self.watch_history or [],
         }
 
 
@@ -177,18 +185,28 @@ def get_my_profile():
     """
     Returns the logged in user profile.
     Auto-creates profile if missing on first request.
+    Populates name and email from Keycloak JWT claims.
+    Does not notify cache agent until profile is explicitly saved.
     """
     user_id = request.user_id
+    claims = getattr(request, "user_claims", {})
+    name, email = extract_user_identity(claims)
 
     profile = db.session.get(Profile, user_id)
     if not profile:
-        # Create new profile
-        profile = Profile(user_id=user_id)
+        profile = Profile(user_id=user_id, name=name, email=email)
         db.session.add(profile)
         db.session.commit()
-
-        # Notify cache agent (best effort)
-        notify_cache_agent(profile.user_id)
+    else:
+        updated = False
+        if name and profile.name != name:
+            profile.name = name
+            updated = True
+        if email and profile.email != email:
+            profile.email = email
+            updated = True
+        if updated:
+            db.session.commit()
 
     return jsonify(profile.to_dict()), 200
 
@@ -200,10 +218,12 @@ def update_my_profile():
     Updates fields on the logged-in user's profile.
     """
     user_id = request.user_id
+    claims = getattr(request, "user_claims", {})
+    name, email = extract_user_identity(claims)
 
     profile = db.session.get(Profile, user_id)
     if not profile:
-        return jsonify({"error": "this user doesnt have a profile"})
+        return jsonify({"error": "this user doesnt have a profile"}), 404
 
     body = request.get_json(silent=True) or {}
 
@@ -219,6 +239,11 @@ def update_my_profile():
         if field in body:
             setattr(profile, field, body[field])
 
+    if name and not profile.name:
+        profile.name = name
+    if email and not profile.email:
+        profile.email = email
+
     db.session.commit()
 
     # Notify cache agent (best effort)
@@ -227,10 +252,41 @@ def update_my_profile():
     return jsonify(profile.to_dict()), 200
 
 
+@app.route("/profiles", methods=["GET"])
+@app.route("/profiles/", methods=["GET"])
+def list_profiles():
+    """
+    Returns user profiles so members can discover what others are watching.
+    Supports optional search query ?q=... and optional ?exclude=<user_id>
+    """
+    q = request.args.get("q", "").strip().lower()
+    exclude = request.args.get("exclude", "").strip()
+
+    profiles = db.session.query(Profile).all()
+    if exclude:
+        profiles = [p for p in profiles if p.user_id != exclude]
+
+    if q:
+        filtered = []
+        for p in profiles:
+            name = (p.name or "").lower()
+            email = (p.email or "").lower()
+            fav = (p.favorite_movie or "").lower()
+            uid = (p.user_id or "").lower()
+            genres_str = " ".join(p.favorite_genres or []).lower()
+            actors_str = " ".join(p.favorite_actors or []).lower()
+            if q in name or q in email or q in fav or q in uid or q in genres_str or q in actors_str:
+                filtered.append(p.to_dict())
+        return jsonify({"users": filtered}), 200
+
+    return jsonify({"users": [p.to_dict() for p in profiles]}), 200
+
+
+@app.route("/profiles/<user_id>", methods=["GET"])
 @app.route("/profiles/user/<user_id>", methods=["GET"])
 def get_user_profile(user_id):
     """
-    Returns the requested user profile.
+    Returns the requested user profile (including watch history for member discovery).
     """
     profile = db.session.get(Profile, user_id)
     if not profile:
