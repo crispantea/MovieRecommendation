@@ -40,17 +40,17 @@
 \twocolumn[\maketitle\vspace{5em}]
 
 \section*{Abstract}
-This paper presents the design and deployment of an AI-powered movie recommendation platform built as a microservice-based system. The application enables user authentication, profile management, personalized recommendation generation, and cached recommendation delivery in a cloud-native environment. The system integrates Keycloak for identity management, Flask services for business logic, PostgreSQL for persistent storage, Redis for caching, and Ollama for local model inference. The platform is deployed both locally with Docker Compose and in a Kubernetes environment using Helm charts, custom manifests, Terraform, and Ansible automation.
+This project presents the design and deployment of an AI-powered movie recommendation platform built as a microservice-based system. The application enables user authentication, profile management, personalized recommendation generation, and cached recommendation delivery in a cloud-native environment. The system integrates Keycloak for identity management, Flask services for business logic, PostgreSQL for persistent storage, Redis for caching, and Ollama for local model inference. The platform is deployed both locally with Docker Compose and in a Kubernetes environment using Helm charts, custom manifests, Terraform, and Ansible automation.
 
 The project addresses the requirements of a realistic distributed application in which multiple services cooperate to provide a functional user experience while ensuring observability and operational traceability. In addition, the solution includes persistent storage for selected services, an advanced deployment feature described in the project requirements. The result is a reproducible environment for experimentation, benchmarking, and demonstration of an AI-enabled recommendation service in a microservice architecture.
 
 \section{Introduction}
 
-Modern recommendation systems increasingly rely on distributed architectures to separate user interfaces, data management, model inference, and monitoring concerns. In this context, microservices provide modularity, independent deployment, and simpler scaling of individual components. This project follows that paradigm by implementing a movie recommendation platform that combines authentication, profile management, AI-based suggestion generation, and persistent data storage in a complete system.
+Modern recommendation systems increasingly rely on distributed architectures to separate user interfaces, data management, model inference, and monitoring concerns. In this context, microservices provide modularity and independent deployment. This project follows that paradigm by implementing a movie recommendation platform that combines authentication, profile management, AI-based suggestion generation, and persistent data storage in a complete system.
 
 The goal is to provide a simple but functional application that allows users to register, log in, define their preferences, and receive personalized recommendations aligned with both their interests and the movie catalog. In addition, the system includes a proactive cache component that generates recommendations in advance so that users see relevant results quickly after login.
 
-The project is implemented as a realistic cloud-native application and is organized according to the specification defined for the PSIA course project. It emphasizes reproducibility and deployability, while also supporting a monitoring and observability layer suitable for evaluating service health and request latency.
+The project is implemented as a realistic cloud-native application and is organized according to the specification defined for this project. It emphasizes reproducibility and deployability, while also supporting a monitoring and observability layer suitable for evaluating service health and request latency.
 
 \section{System Design and Architecture}
 
@@ -128,3 +128,10 @@ Concurrent clients & Avg. latency (ms) & p95 latency (ms) & Throughput (req/s) &
 The expected bottleneck is the AI inference layer because recommendation generation requires model execution and may be slower than the profile and cache operations. Nevertheless, cache hits and filtered candidate selection can reduce latency in repeated requests. This evaluation helps quantify the trade-off between recommendation quality and system responsiveness. Overall, the project demonstrates a realistic AI-powered recommendation platform that satisfies the base microservice requirements while incorporating advanced persistence and deployment features in a reproducible cloud-native environment.
 
 \end{document}
+
+
+% TODO:
+% - Cloud init (storage class; CSI drivers; updated k8s version to use helm charts to the latest version of the charts)
+% - All different environments
+% - Explain better each service (helm charts, etc...)
+% - Terraform and Ansible usage

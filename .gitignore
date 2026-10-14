@@ -38,3 +38,7 @@ gcphosts
 .env.disks
 .venv/
 .kube/
+
+
+project-report.*
+!project-report.tex
