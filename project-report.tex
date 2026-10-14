@@ -39,10 +39,12 @@
 
 \twocolumn[\maketitle\vspace{5em}]
 
-\section*{Abstract}
-This project presents the design and deployment of an AI-powered movie recommendation platform built as a microservice-based system. The application enables user authentication, profile management, personalized recommendation generation, and cached recommendation delivery in a cloud-native environment. The system integrates Keycloak for identity management, Flask services for business logic, PostgreSQL for persistent storage, Redis for caching, and Ollama for local model inference. The platform is deployed both locally with Docker Compose and in a Kubernetes environment using Helm charts, custom manifests, Terraform, and Ansible automation.
+% TODO: Video link
 
-The project addresses the requirements of a realistic distributed application in which multiple services cooperate to provide a functional user experience while ensuring observability and operational traceability. In addition, the solution includes persistent storage for selected services, an advanced deployment feature described in the project requirements. The result is a reproducible environment for experimentation, benchmarking, and demonstration of an AI-enabled recommendation service in a microservice architecture.
+
+\section*{Abstract}
+This project presents the design and deployment of an AI-powered movie recommendation platform built as a microservice-based system. The application enables user authentication, profile management, personalized recommendation generation, and cached recommendation delivery in a cloud-native environment. The system addresses the requirements of a realistic distributed application in which multiple services cooperate to provide a functional user experience while ensuring observability and operational traceability. In addition, the solution includes persistent storage for application state, an advanced deployment feature described in the project requirements. The result is a reproducible environment for experimentation, benchmarking, and demonstration of an AI-enabled recommendation service in a microservice architecture.
+
 
 \section{Introduction}
 
@@ -50,11 +52,11 @@ Modern recommendation systems increasingly rely on distributed architectures to 
 
 The goal is to provide a simple but functional application that allows users to register, log in, define their preferences, and receive personalized recommendations aligned with both their interests and the movie catalog. In addition, the system includes a proactive cache component that generates recommendations in advance so that users see relevant results quickly after login.
 
-The project is implemented as a realistic cloud-native application and is organized according to the specification defined for this project. It emphasizes reproducibility and deployability, while also supporting a monitoring and observability layer suitable for evaluating service health and request latency.
+The project is implemented as a realistic cloud-native application and is organized according to the specification defined for this project. It emphasizes reproducibility and deployability, while also supporting a monitoring and observability layer suitable for evaluating relevant metrics.
 
 \section{System Design and Architecture}
 
-The application is structured as several independent services connected through HTTP interfaces and environment-based configuration. The main components are:
+The application is structured as several independent services connected through HTTP interfaces and environment-based configuration.
 
 \begin{figure*}[t]
     \centering
@@ -62,39 +64,67 @@ The application is structured as several independent services connected through 
     \caption{Overview of the microservice architecture for the movie recommendation platform.}
 \end{figure*}
 
+\subsection{Overall}
+
+The system is composed by the following microservices:
+
 \begin{itemize}
+    \item \textbf{Ingress and reverse proxy:} KGateway routes HTTP traffic to services in Kubernetes through Gateway API resources. In Docker Compose, Nginx within the frontend container serves the React application and proxies the profiles, inference, and cache API paths to their respective services.
     \item \textbf{Frontend:} a web interface developed with React and Vite, used for authentication and interaction with the recommendation system.
     \item \textbf{Authentication:} Keycloak provides identity management and token validation for secure access across microservices.
-    \item \textbf{Profiles service:} stores user profiles, favorite genres, watch history, and mood information in a PostgreSQL database.
-    \item \textbf{Movies service:} provides the movie catalog and metadata used to improve the recommendations' quality. The goal is for the inference service to rank cataloged movies.
-    \item \textbf{Inference service:} invokes a local language model through Ollama to generate recommendation results based on user preferences.
-    \item \textbf{Cache agent:} stores up-to-date recommendations for each user (in Redis) for fast retrieval and warm-start experience.
+    \item \textbf{Profiles service:} exposes a Flask REST API for managing user profiles, preferences, and watch history, with data stored in PostgreSQL.
+    \item \textbf{Movies service:} exposes a Flask REST API for the movie catalog and metadata (stored in a PostgreSQL database) used by the inference service to rank cataloged movies.
+    \item \textbf{Inference service:} exposes a Flask REST API that coordinates recommendation generation, using profile and movie data and invoking the local Ollama model.
+    \item \textbf{Cache agent:} exposes a Flask REST API and background refresh logic to store recommendations in Redis for fast retrieval.
     \item \textbf{Monitoring stack:} Grafana, Mimir, and OpenTelemetry provide metrics and dashboards for observability.
 \end{itemize}
 
+\subsection{Communication and interaction}
+
+\textbf{KGateway} provides the shared HTTP ingress for Kubernetes deployments, while \textbf{Nginx} replicates its core path-based routing functionality in the local Docker Compose deployment. The Kubernetes deployment installs the Gateway API and KGateway custom resource definitions, then creates a Gateway with an HTTP listener exposed through a NodePort Service. HTTPRoutes attach to this Gateway, match configured path prefixes, and forward requests to their corresponding services. The Kind cluster maps the Gateway service to a host port, while the GCP environment exposes the application through the cluster's external address.
+
 The \textbf{frontend} communicates with backend microservices through authenticated (\textbf{Keycloak} produces and verifies tokens for users' requests) REST endpoints rather than relying on a monolithic backend. Each service has a clearly defined responsibility, with service-to-service communication handled through authenticated HTTP requests and environment-based routing.
 
-The \textbf{Profiles Service} handles profile-related operations, allowing users to view and update their profiles and explore those of other users. The \textbf{Inference Service} generates recommendations on demand by retrieving the user's profile and matching movies from the \textbf{Movies Catalog Service}. It then combines this information into a structured prompt and sends it to the LLM to generate personalized recommendations.
+The \textbf{Profiles Service} exposes a Flask REST API that validates profile updates (triggered by frontend) and stores preferences, actors, mood, watch history, and visibility settings in PostgreSQL.
 
-The \textbf{Cache Service} provides cached recommendations for faster responses. A background agent asynchronously refreshes recommendations and stores them in Redis, reducing latency and avoiding unnecessary inference requests.
+For recommendation generation, the frontend calls the \textbf{Inference Service} API. Inference fetches the user's profile from Profiles Service and candidate movies from the \textbf{Movies Service}, filters watched or unsuitable titles, then sends the resulting context to Ollama. Structured recommendations are returned to the frontend.
 
-For observability, Keycloak exposes metrics collected by \textbf{OpenTelemetry}, while the Inference Service pushes telemetry data to the observability stack. \textbf{Mimir} stores the collected metrics, and \textbf{Grafana} queries Mimir to visualize them through dashboards, enabling centralized monitoring of authentication and recommendation workloads.
+After a profile update, Profiles sends a best-effort event to the \textbf{Cache Agent}, which schedules an asynchronous refresh. The agent calls Inference for that user's recommendations and stores the result in Redis. The frontend reads through the cache API; a cache miss returns an empty fallback, while a failed refresh preserves any existing entry.
 
-This architecture promotes loose coupling, independent deployment and scaling, improved performance, and fault isolation across the recommendation workflow. In practice, the platform relies on Keycloak for user authentication and identity federation. The frontend authenticates through the Keycloak JavaScript client, while the backend services validate JSON Web Tokens using the Keycloak JWKS endpoint. This ensures that access to user-specific profile information and recommendation endpoints remains protected.
+For observability, \textbf{OpenTelemetry} collects Keycloak metrics and inference telemetry, \textbf{Mimir} stores the metrics, and \textbf{Grafana} presents them in dashboards.
 
-The profiles service stores the user state in PostgreSQL and exposes endpoints to retrieve and update the active profile. User data includes favorite genres, disliked genres, actors, mood, watch history, and profile visibility. Input validation is performed to maintain consistency and avoid malformed data. The inference service acts as the orchestration layer between the profiles service, movie catalog, and LLM. It retrieves candidate movies, filters out previously watched titles and undesired genres, and constructs a recommendation request based on the profile. The local model then ranks the candidate list and returns a structured set of movie suggestions.
+\subsection{Deployment and Configuration}
 
-The cache agent is responsible for storing and refreshing recommendation data. When a profile is updated, the service triggers a re-evaluation of recommendations and stores the result in Redis. This allows the application to provide immediate personalized recommendations when users log in, reducing the delay associated with generating recommendations from scratch. This mechanism significantly improves responsiveness and is especially useful in a recommendation system where users expect quick results after authentication.
+\subsubsection{Deployment Environments.}
 
-The system integrates telemetry collection and dashboards to support operational visibility. Metrics from service execution and infrastructure health are exported through OpenTelemetry and centralized in Grafana and Mimir. This enables tracing of user requests, evaluation of service health, and identification of bottlenecks in the architecture.
+The repository supports different environments for deployment: local Docker Compose, a local Kind cluster, and a self-managed Kubernetes cluster on GCP. Compose runs the application and its dependencies locally. Kind creates a local cluster and loads the application images into it, while the cloud environment provisions compute nodes for the control plane and workers. Environment files provide deployment-specific settings.
+
+\subsubsection{Application and Platform Packaging.}
+
+Kubernetes application workloads are maintained as base manifests and applied with Kustomize and environment substitution. Helm charts package the gateway, Keycloak, PostgreSQL (databases for the profiles and movies services), Ollama, Redis, Grafana, Mimir, and the OpenTelemetry collector. Chart dependencies are pinned in the repository for reproducible deployments. The \texttt{just} recipes build chart dependencies, install or upgrade releases, and apply the Kustomize resources.
+
+\subsubsection{Cloud Infrastructure, Storage, and Automation.}
+
+The cloud deployment is orchestrated by the \texttt{just cloud-up} recipe and proceeds in four stages:
+
+\begin{enumerate}
+    \item \textbf{Infrastructure provisioning.} Terraform creates the GCP compute instances, network and firewall configuration, and persistent disks (for authentication, profiles, and cache data). It also generates the Ansible inventory and exports disk handles for Kubernetes.
+    \item \textbf{Node and cluster configuration.} Ansible configures the Ubuntu nodes and containerd, installs Kubernetes, initializes the control plane with kubeadm and Calico, joins worker nodes, transfers application images, and updates the cloud environment with the control-plane address.
+    \item \textbf{Persistent-storage setup.} Cloud initialization installs the GCP Persistent Disk CSI driver and applies a StorageClass. The driver lets Kubernetes attach and mount the Terraform-provisioned disks as pod volumes, preserving database and cache data across pod replacement; the StorageClass defines their retention and expansion behavior.
+    \item \textbf{Application deployment.} The Kubernetes deployment installs the Gateway API and gateway, then deploys service manifests and Helm releases for the application and observability stack. Each microservice and its dependencies are grouped in its dedicated namespace; for example, the Profiles API and its PostgreSQL release run in the profiles namespace. Kustomize and environment substitution configure application resources, while Terraform initializes Keycloak and Grafana resources after their releases are installed.
+\end{enumerate}
+
+The \texttt{just} recipes coordinate these stages as well as cleanup and environment selection.
+
 
 \section{Advanced Components and Deployment Methods}
 
-One of the advanced deployment options described in the project specification is the use of persistent storage. The implemented solution includes persistent volumes for the main stateful services, namely Keycloak PostgreSQL, the profiles service database, and the Redis cache database. This ensures that data remains available across restarts and is not lost after a temporary infrastructure interruption.
+Among the advanced components and deployment methods proposed by the project, we selected \textbf{persistent storage} as the feature to implement. It was chosen to protect application state from pod restarts and replacements, which is especially important for databases and cached recommendations.
 
-This feature is particularly relevant in a cloud-native application because it provides a more robust operational baseline and aligns with deployment practices expected in a realistic production environment. It also directly addresses the requirement that the system remain functional even after infrastructure restart events.
+For the GCP Kubernetes deployment, Terraform provisions persistent disks for Keycloak PostgreSQL, the profiles database, and Redis, then exports their volume handles. The GCP Persistent Disk CSI driver lets Kubernetes attach and mount these existing disks. Helm chart templates conditionally create the corresponding PersistentVolumes and PersistentVolumeClaims when persistence is enabled (cloud deployments only); each stateful workload mounts its claim. The shared StorageClass configures the CSI provisioner, delays binding until a pod uses the volume, permits expansion, and retains the disk when a claim is released.
 
-In addition to persistence, the project relies on Kubernetes and Helm-based deployment automation, Docker Compose for local experimentation, and observability tooling for operational monitoring. This composition of advanced deployment methods demonstrates a realistic, reproducible environment for microservice orchestration and validation. The project supports both local and Kubernetes-based deployment: Docker Compose is used for rapid local experimentation, while Helm charts and custom manifests orchestrate the cluster deployment. This multi-environment strategy addresses a key project requirement by ensuring that the solution remains reproducible and realistic while enabling validation under different infrastructure conditions.
+This implementation leverages self-hosted persistent storage to decouple database and cache lifecycles from ephemeral compute nodes. Consequently, the full infrastructure (all VMs and pods) can be safely powered down and restarted with zero loss of application state, seamlessly reattaching storage volumes upon system restoration.
+
 
 \section{Evaluation and Performance Study}
 
@@ -128,10 +158,3 @@ Concurrent clients & Avg. latency (ms) & p95 latency (ms) & Throughput (req/s) &
 The expected bottleneck is the AI inference layer because recommendation generation requires model execution and may be slower than the profile and cache operations. Nevertheless, cache hits and filtered candidate selection can reduce latency in repeated requests. This evaluation helps quantify the trade-off between recommendation quality and system responsiveness. Overall, the project demonstrates a realistic AI-powered recommendation platform that satisfies the base microservice requirements while incorporating advanced persistence and deployment features in a reproducible cloud-native environment.
 
 \end{document}
-
-
-% TODO:
-% - Cloud init (storage class; CSI drivers; updated k8s version to use helm charts to the latest version of the charts)
-% - All different environments
-% - Explain better each service (helm charts, etc...)
-% - Terraform and Ansible usage
