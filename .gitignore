@@ -39,6 +39,9 @@ gcphosts
 .venv/
 .kube/
 
+# Python
+__pycache__/
+
 
 project-report.*
 !project-report.tex

@@ -1,0 +1,1154 @@
+:root {
+  --lb-bg: #14181c;
+  --lb-bg-main: #1b2127;
+  --lb-header-bg: #14181c;
+  --lb-surface: #2c3440;
+  --lb-surface-dark: #202830;
+  --lb-card-footer: #445566;
+  --lb-rule: #445566;
+  --lb-border: #2c3440;
+  --lb-text-white: #ffffff;
+  --lb-text-bright: #ddeeff;
+  --lb-text-body: #99aabb;
+  --lb-text-muted: #667788;
+  --lb-text-footer: #bbccdd;
+  --lb-green: #00e054;
+  --lb-green-btn: #00ac1c;
+  --lb-blue: #40bcf4;
+  --lb-orange: #ff8000;
+  --lb-danger: #e05050;
+  --font-sans: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-serif: Georgia, 'Times New Roman', Times, serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--lb-bg);
+  color: var(--lb-text-body);
+  font-family: var(--font-sans);
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: var(--font-sans);
+  font-size: inherit;
+  color: inherit;
+}
+
+/* Auth bootstrap screen */
+.auth-status-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--lb-bg);
+  color: var(--lb-text-body);
+  font-size: 14px;
+}
+
+/* App Shell & Container */
+.app-shell {
+  min-height: 100vh;
+  background-color: var(--lb-bg-main);
+}
+
+.main-container {
+  position: relative;
+  max-width: 950px;
+  margin: 0 auto;
+  padding: 32px 20px 72px;
+}
+
+/* Top Navigation Header (Letterboxd flat dark bar) */
+.site-header {
+  background-color: var(--lb-header-bg);
+  border-bottom: 1px solid #202830;
+}
+
+.site-header-inner {
+  max-width: 950px;
+  margin: 0 auto;
+  height: 62px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+/* Top-Left: User Panel Button + Log Out */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-panel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--lb-text-body);
+  cursor: pointer;
+  text-align: left;
+}
+
+.user-panel-btn:hover {
+  color: var(--lb-text-white);
+  background-color: #202830;
+}
+
+.user-panel-btn.is-active {
+  position: relative;
+  z-index: 45;
+  color: var(--lb-text-white);
+  background-color: var(--lb-surface-dark);
+  border-color: var(--lb-rule);
+  border-bottom-color: var(--lb-surface-dark);
+  border-radius: 3px 3px 0 0;
+}
+
+.user-panel-btn.is-active::after {
+  content: '';
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  top: 100%;
+  height: 30px;
+  background-color: var(--lb-surface-dark);
+  border-left: 1px solid var(--lb-rule);
+  border-right: 1px solid var(--lb-rule);
+  pointer-events: none;
+}
+
+.user-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  display: block;
+}
+
+.user-panel-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.user-panel-name {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: inherit;
+}
+
+.user-panel-sub {
+  font-size: 11px;
+  color: var(--lb-text-muted);
+}
+
+.user-panel-chevron {
+  color: var(--lb-text-muted);
+  flex-shrink: 0;
+}
+
+/* Top-Center: User Discovery Search Bar */
+.header-center {
+  position: relative;
+  flex: 1;
+  max-width: 340px;
+}
+
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  right: 10px;
+  color: var(--lb-text-muted);
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  padding: 6px 30px 6px 12px;
+  background-color: var(--lb-surface);
+  border: 1px solid #384452;
+  border-radius: 15px;
+  color: var(--lb-text-bright);
+  font-size: 12px;
+}
+
+.search-input::placeholder {
+  color: var(--lb-text-muted);
+}
+
+.search-input:focus {
+  outline: none;
+  background-color: #ffffff;
+  color: #14181c;
+  border-color: #ffffff;
+}
+
+.search-input:focus::placeholder {
+  color: #667788;
+}
+
+.search-clear-btn {
+  position: absolute;
+  right: 26px;
+  background: transparent;
+  border: none;
+  color: var(--lb-text-muted);
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 11px;
+}
+
+.search-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background-color: var(--lb-surface);
+  border: 1px solid var(--lb-rule);
+  border-radius: 3px;
+  z-index: 60;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.search-dropdown-header {
+  padding: 7px 12px;
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--lb-text-body);
+  border-bottom: 1px solid #384452;
+  background-color: var(--lb-surface-dark);
+}
+
+.search-result-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #384452;
+  color: var(--lb-text-bright);
+  text-align: left;
+  cursor: pointer;
+}
+
+.search-result-item:last-child {
+  border-bottom: none;
+}
+
+.search-result-item:hover {
+  background-color: var(--lb-card-footer);
+  color: var(--lb-text-white);
+}
+
+.search-result-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.search-result-info {
+  min-width: 0;
+}
+
+.search-result-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lb-text-white);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-result-email {
+  font-size: 11px;
+  color: var(--lb-text-body);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-result-fav {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 2px;
+  background-color: var(--lb-surface-dark);
+  color: var(--lb-text-body);
+  white-space: nowrap;
+  flex-shrink: 0;
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-empty {
+  padding: 14px 12px;
+  font-size: 12px;
+  color: var(--lb-text-body);
+  text-align: center;
+}
+
+/* Top-Right: Log Movie Button */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.log-movie-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 13px;
+  font-size: 11px;
+}
+
+.log-movie-plus-icon {
+  display: block;
+  flex-shrink: 0;
+}
+
+.log-movie-modal {
+  max-width: 400px;
+}
+
+.logout-btn {
+  padding: 5px 10px;
+  background: transparent;
+  border: 1px solid #384452;
+  border-radius: 3px;
+  color: var(--lb-text-body);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  cursor: pointer;
+}
+
+.logout-btn:hover {
+  color: var(--lb-text-white);
+  border-color: var(--lb-text-body);
+}
+
+/* Letterboxd Welcome Greeting Banner (Helvetica Bold, hugs Cached Picks below) */
+.welcome-greeting {
+  text-align: center;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--lb-text-body);
+  margin: 0 0 10px;
+  letter-spacing: -0.01em;
+}
+
+.welcome-username {
+  color: var(--lb-text-bright);
+  border-bottom: 1px solid var(--lb-text-muted);
+  padding-bottom: 1px;
+  cursor: pointer;
+}
+
+.welcome-username:hover {
+  color: var(--lb-text-white);
+  border-bottom-color: var(--lb-text-white);
+}
+
+/* Letterboxd Section Header Bar (1px solid #445566 bottom rule) */
+.section-header-bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--lb-rule);
+  padding-bottom: 5px;
+  margin-bottom: 14px;
+}
+
+.section-heading {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.075em;
+  color: var(--lb-text-body);
+}
+
+.section-meta-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.075em;
+  color: var(--lb-text-muted);
+}
+
+/* Letterboxd Poster Row (5 across, matching screenshot) */
+.recommendations-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 860px) {
+  .recommendations-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 580px) {
+  .site-header-inner {
+    height: auto;
+    padding: 10px 16px;
+    flex-wrap: wrap;
+  }
+  .header-center {
+    order: 3;
+    max-width: 100%;
+    flex-basis: 100%;
+  }
+  .recommendations-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Individual Letterboxd Poster Card + Attached Footer Strip + Bottom Metadata */
+.lb-card-unit {
+  display: flex;
+  flex-direction: column;
+}
+
+.lb-poster-box {
+  display: flex;
+  flex-direction: column;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background-color: var(--lb-surface-dark);
+}
+
+.lb-poster-box:hover {
+  border-color: var(--lb-green);
+}
+
+.lb-poster-art {
+  position: relative;
+  aspect-ratio: 2 / 3;
+  width: 100%;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+/* Flat muted theatrical poster plates */
+.poster-tone-0 {
+  background-color: #1c2938;
+}
+.poster-tone-1 {
+  background-color: #2c221e;
+}
+.poster-tone-2 {
+  background-color: #1c2d27;
+}
+.poster-tone-3 {
+  background-color: #2a1f2d;
+}
+.poster-tone-4 {
+  background-color: #23272e;
+}
+
+.lb-poster-top-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.lb-poster-year-top {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--lb-text-body);
+}
+
+.lb-poster-title-block {
+  margin: 0;
+  text-align: left;
+  padding: 2px 0 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.lb-poster-title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.22;
+  color: var(--lb-text-white);
+}
+
+.lb-poster-reason {
+  margin: 0;
+  flex: 1;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--lb-text-body);
+  display: -webkit-box;
+  -webkit-line-clamp: 7;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Attached Slate Footer Bar on Bottom of Poster (Genres only, no user circle) */
+.lb-poster-footer {
+  background-color: var(--lb-card-footer);
+  padding: 6px 9px;
+  display: flex;
+  align-items: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 28px;
+}
+
+.lb-footer-genres {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+  color: var(--lb-text-footer);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lb-genre-fav {
+  color: var(--lb-text-white);
+  font-weight: 700;
+}
+
+/* Below-Card Avg Rating & Release Year Row */
+.lb-under-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 2px 0;
+  font-size: 11px;
+  color: var(--lb-text-muted);
+}
+
+.lb-avg-rating {
+  color: var(--lb-text-body);
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.lb-star-icon {
+  color: var(--lb-green);
+}
+
+.lb-under-year {
+  font-size: 11px;
+  color: var(--lb-text-muted);
+}
+
+/* Empty Recommendations Placeholder (5 empty layout slots + Rectangular Green Button Overlay) */
+.empty-recommendations-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.lb-empty-card-unit {
+  pointer-events: none;
+  user-select: none;
+}
+
+.lb-empty-poster-box {
+  aspect-ratio: 2 / 3;
+  width: 100%;
+  background-color: rgba(32, 40, 48, 0.45);
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+}
+
+.empty-recommendations-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.empty-profile-cta-btn {
+  pointer-events: auto;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 13px 26px;
+  background-color: var(--lb-green-btn);
+  color: var(--lb-text-white);
+  border: none;
+  border-radius: 4px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.empty-profile-cta-btn:hover {
+  background-color: #009918;
+}
+
+/* Letterboxd-styled Layered Loading Add-on (appears after saving profile) */
+.empty-profile-loading-panel {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 22px;
+  background-color: var(--lb-surface-dark);
+  border: 1px solid var(--lb-rule);
+  border-radius: 4px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.78);
+  pointer-events: auto;
+  user-select: none;
+  max-width: 90%;
+}
+
+.empty-profile-spinner {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border: 2.5px solid rgba(255, 255, 255, 0.12);
+  border-top-color: var(--lb-green);
+  border-radius: 50%;
+  animation: lb-spinner-rotate 0.8s linear infinite;
+}
+
+@keyframes lb-spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.empty-profile-loading-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+}
+
+.empty-profile-loading-heading {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.075em;
+  color: var(--lb-text-white);
+}
+
+.empty-profile-loading-sub {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--lb-text-muted);
+  letter-spacing: 0.01em;
+}
+
+
+/* On-Demand AI Section (Below Cached Recommendations) */
+.on-demand-section {
+  margin-top: 42px;
+}
+
+.prompt-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  align-items: center;
+}
+
+.prompt-input {
+  flex: 1;
+  padding: 9px 12px;
+  background-color: var(--lb-surface);
+  border: 1px solid var(--lb-rule);
+  border-radius: 3px;
+  color: var(--lb-text-white);
+  font-size: 13px;
+}
+
+.prompt-input::placeholder {
+  color: var(--lb-text-muted);
+}
+
+.prompt-input:focus {
+  outline: none;
+  background-color: #384250;
+  border-color: var(--lb-text-body);
+}
+
+/* Flat Letterboxd Buttons */
+.btn-primary {
+  padding: 9px 16px;
+  background-color: var(--lb-green-btn);
+  color: var(--lb-text-white);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #009918;
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  padding: 8px 14px;
+  background-color: var(--lb-card-footer);
+  color: var(--lb-text-bright);
+  border: none;
+  border-radius: 3px;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  cursor: pointer;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #556677;
+  color: var(--lb-text-white);
+}
+
+/* Collapsible Profile Editor Panel (Overlaps page & Bridged to Header Button) */
+.profile-drawer-wrapper {
+  position: absolute;
+  top: 14px;
+  left: 20px;
+  width: calc(100% - 40px);
+  max-width: 560px;
+  z-index: 42;
+  background-color: var(--lb-surface-dark);
+  border: 1px solid var(--lb-rule);
+  border-radius: 0 3px 3px 3px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.78);
+}
+
+.profile-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--lb-rule);
+}
+
+.profile-drawer-title {
+  margin: 0;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.075em;
+  color: var(--lb-text-body);
+}
+
+.drawer-close-btn {
+  background: transparent;
+  border: 1px solid var(--lb-rule);
+  color: var(--lb-text-body);
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-size: 10.5px;
+  cursor: pointer;
+}
+
+.drawer-close-btn:hover {
+  color: var(--lb-text-white);
+  border-color: var(--lb-text-body);
+}
+
+.profile-form {
+  padding: 12px 14px;
+}
+
+.profile-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.form-field {
+  margin-bottom: 12px;
+}
+
+.form-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10.5px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.075em;
+  color: var(--lb-text-body);
+  margin-bottom: 5px;
+}
+
+.form-label-hint {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--lb-text-muted);
+}
+
+.dark-input,
+.dark-select {
+  width: 100%;
+  padding: 6px 9px;
+  background-color: var(--lb-surface);
+  border: 1px solid var(--lb-rule);
+  border-radius: 3px;
+  color: var(--lb-text-white);
+  font-size: 12px;
+}
+
+.dark-input::placeholder {
+  color: var(--lb-text-muted);
+}
+
+.dark-input:focus,
+.dark-select:focus {
+  outline: none;
+  background-color: #384250;
+  border-color: var(--lb-text-body);
+}
+
+/* Genre Chips */
+.genre-Grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.genre-toggle-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 7px;
+  background-color: var(--lb-surface);
+  border: 1px solid #384452;
+  border-radius: 3px;
+  font-size: 10.5px;
+  color: var(--lb-text-body);
+  cursor: pointer;
+  user-select: none;
+  text-transform: capitalize;
+}
+
+.genre-toggle-pill:hover {
+  color: var(--lb-text-white);
+  border-color: var(--lb-rule);
+}
+
+.genre-toggle-pill.is-selected {
+  background-color: var(--lb-card-footer);
+  border-color: var(--lb-text-body);
+  color: var(--lb-text-white);
+}
+
+.genre-toggle-pill input {
+  display: none;
+}
+
+/* Watch History List */
+.watch-history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.watch-history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  background-color: var(--lb-surface);
+  border: 1px solid #384452;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.watch-history-title {
+  font-family: var(--font-serif);
+  font-weight: 700;
+  color: var(--lb-text-white);
+}
+
+.watch-history-rating {
+  color: var(--lb-green);
+  font-size: 12px;
+  margin-left: 8px;
+}
+
+.watch-remove-btn {
+  background: transparent;
+  border: 1px solid #384452;
+  color: var(--lb-text-muted);
+  border-radius: 2px;
+  padding: 2px 7px;
+  font-size: 10px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.watch-remove-btn:hover {
+  color: var(--lb-danger);
+  border-color: var(--lb-danger);
+}
+
+.watch-add-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.watch-add-row > .dark-input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 9px;
+}
+
+.watch-add-row > .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  padding: 0 14px;
+  flex-shrink: 0;
+}
+
+/* Letterboxd Clickable & Draggable 5-Star Rating Picker */
+.lb-star-picker-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+.lb-star-picker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 2px;
+  cursor: pointer;
+  user-select: none;
+  touch-action: none;
+}
+
+.lb-star-picker:focus {
+  outline: none;
+}
+
+.lb-star-unit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.lb-star-unit svg {
+  display: block;
+}
+
+/* Status Banners */
+.status-banner {
+  padding: 8px 12px;
+  border-radius: 3px;
+  font-size: 12px;
+  margin-bottom: 14px;
+}
+
+.status-banner.error {
+  background-color: #3a1d22;
+  border: 1px solid var(--lb-danger);
+  color: #ff9999;
+}
+
+.status-banner.success {
+  background-color: #193324;
+  border: 1px solid var(--lb-green);
+  color: var(--lb-green);
+}
+
+/* Read-Only User Profile Modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background-color: rgba(14, 17, 20, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 560px;
+  max-height: 88vh;
+  overflow-y: auto;
+  background-color: var(--lb-surface-dark);
+  border: 1px solid var(--lb-rule);
+  border-radius: 3px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px 20px;
+  background-color: var(--lb-bg);
+  border-bottom: 1px solid var(--lb-rule);
+}
+
+.modal-user-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.modal-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  display: block;
+}
+
+.modal-user-name {
+  margin: 0 0 2px;
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--lb-text-white);
+}
+
+.modal-user-email {
+  margin: 0;
+  font-size: 12px;
+  color: var(--lb-text-muted);
+}
+
+.modal-body {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.favorite-movie-banner {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  background-color: var(--lb-surface);
+  border: 1px solid var(--lb-rule);
+  border-radius: 3px;
+}
+
+.favorite-movie-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.075em;
+  color: var(--lb-text-body);
+  margin-bottom: 2px;
+}
+
+.favorite-movie-title {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--lb-text-white);
+}
+
+.mood-quote-box {
+  padding: 10px 12px;
+  background-color: var(--lb-surface);
+  border-left: 2px solid var(--lb-rule);
+  font-size: 12px;
+  color: var(--lb-text-bright);
+}
+
+.movie-genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.genre-pill {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 2px;
+  background-color: var(--lb-surface);
+  color: var(--lb-text-body);
+  border: 1px solid #384452;
+}
+
+.genre-pill.is-favorite {
+  background-color: var(--lb-card-footer);
+  color: var(--lb-text-white);
+}
+

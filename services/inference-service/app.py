@@ -11,8 +11,10 @@ Endpoints:
 """
 
 import os
+import re
 import time
 import json
+import random
 import logging
 from datetime import datetime, timezone
 from functools import wraps
@@ -137,7 +139,7 @@ RECOMMENDATION_SCHEMA = {
 # ================================================================================================ #
 def filter_and_prune_candidates(candidates: list, profile: dict) -> list[dict]:
     """
-    Filters out watched movies and disliked genres, and prunes each movie to
+    Filters out watched movies (and favorite movie), and prunes each movie to
     essential fields: {"title": m.title, "year": m.release_year, "genres": m.genres}.
     """
     watched_titles = set()
@@ -152,15 +154,16 @@ def filter_and_prune_candidates(candidates: list, profile: dict) -> list[dict]:
             t_clean = str(t).strip().lower()
             if t_clean:
                 watched_titles.add(t_clean)
+                t_base = re.sub(r"\s*\(\d{4}\)$", "", t_clean).strip()
+                if t_base:
+                    watched_titles.add(t_base)
 
-    disliked_raw = profile.get("disliked_genres") or []
-    if isinstance(disliked_raw, str):
-        disliked_list = [g.strip() for g in disliked_raw.split(",") if g.strip()]
-    elif isinstance(disliked_raw, (list, tuple, set)):
-        disliked_list = [str(g).strip() for g in disliked_raw if str(g).strip()]
-    else:
-        disliked_list = []
-    disliked_genres = {g.lower() for g in disliked_list}
+    fav_movie_clean = str(profile.get("favorite_movie") or "").strip().lower()
+    if fav_movie_clean:
+        watched_titles.add(fav_movie_clean)
+        fav_base = re.sub(r"\s*\(\d{4}\)$", "", fav_movie_clean).strip()
+        if fav_base:
+            watched_titles.add(fav_base)
 
     seen_titles = set()
     pruned = []
@@ -177,16 +180,16 @@ def filter_and_prune_candidates(candidates: list, profile: dict) -> list[dict]:
             continue
 
         title_lower = title_clean.lower()
+        title_base = re.sub(r"\s*\(\d{4}\)$", "", title_lower).strip()
 
         # 1. Deduplicate by title
-        if title_lower in seen_titles:
+        if title_lower in seen_titles or title_base in seen_titles:
             continue
 
         # 2. Exclude watched movies (case-insensitive title check)
-        if title_lower in watched_titles:
+        if title_lower in watched_titles or title_base in watched_titles:
             continue
 
-        # 3. Exclude movies matching any genre in disliked_genres
         raw_genres = m.get("genres")
         if isinstance(raw_genres, str):
             genre_items = [g.strip() for g in raw_genres.split(",") if g.strip()]
@@ -194,10 +197,6 @@ def filter_and_prune_candidates(candidates: list, profile: dict) -> list[dict]:
             genre_items = [str(g).strip() for g in raw_genres if str(g).strip()]
         else:
             genre_items = []
-
-        movie_genres = {g.lower() for g in genre_items}
-        if disliked_genres and (movie_genres & disliked_genres):
-            continue
 
         year = m.get("release_year")
         if year is None:
@@ -210,12 +209,24 @@ def filter_and_prune_candidates(candidates: list, profile: dict) -> list[dict]:
         synopsis = m.get("synopsis")
         synopsis_clean = str(synopsis).strip() if synopsis is not None else ""
 
+        raw_rating = m.get("rating")
+        try:
+            rating = float(raw_rating) if raw_rating is not None else None
+            if rating is not None:
+                rating = round(min(5.0, rating / 2.0 if rating > 5.0 else rating), 1)
+        except (ValueError, TypeError):
+            rating = None
+
         seen_titles.add(title_lower)
+        if title_base:
+            seen_titles.add(title_base)
         item = {
             "title": title_clean,
             "year": year,
             "genres": genre_items,
         }
+        if rating is not None:
+            item["rating"] = rating
         if synopsis_clean:
             item["synopsis"] = synopsis_clean
         pruned.append(item)
@@ -223,11 +234,78 @@ def filter_and_prune_candidates(candidates: list, profile: dict) -> list[dict]:
     return pruned
 
 
-def fetch_candidate_movies(profile: dict, headers: dict | None = None) -> list[dict]:
+def extract_fav_genres(profile: dict | None) -> set[str]:
+    if not profile or not isinstance(profile, dict):
+        return set()
+    raw = profile.get("favorite_genres") or []
+    if isinstance(raw, str):
+        return {g.strip().lower() for g in raw.split(",") if g.strip()}
+    elif isinstance(raw, (list, tuple, set)):
+        return {str(g).strip().lower() for g in raw if str(g).strip()}
+    return set()
+
+
+def get_movie_genre_overlap(movie: dict, fav_genres: set[str]) -> int:
+    if not fav_genres or not isinstance(movie, dict):
+        return 0
+    raw_genres = movie.get("genres") or []
+    if isinstance(raw_genres, str):
+        m_genres = {g.strip().lower() for g in raw_genres.split(",") if g.strip()}
+    elif isinstance(raw_genres, (list, tuple, set)):
+        m_genres = {str(g).strip().lower() for g in raw_genres if str(g).strip()}
+    else:
+        m_genres = set()
+    return len(m_genres & fav_genres)
+
+
+def sample_diverse_candidates(
+    candidates: list[dict],
+    profile: dict | None = None,
+    limit: int = CANDIDATE_LIMIT,
+) -> list[dict]:
+    """
+    Selects candidate movies prioritizing exact genre matches first,
+    while randomizing within tiers so recommendations remain fresh and diverse.
+    """
+    if not candidates or len(candidates) <= limit:
+        return list(candidates)
+
+    fav_genres = extract_fav_genres(profile)
+    if not fav_genres:
+        anchors = candidates[:2]
+        pool = candidates[2:]
+        needed = limit - len(anchors)
+        return anchors + random.sample(pool, min(len(pool), needed))
+
+    # Group candidates by genre overlap count descending
+    tier_map: dict[int, list[dict]] = {}
+    for c in candidates:
+        overlap = get_movie_genre_overlap(c, fav_genres)
+        tier_map.setdefault(overlap, []).append(c)
+
+    selected = []
+    for overlap in sorted(tier_map.keys(), reverse=True):
+        tier = tier_map[overlap]
+        needed = limit - len(selected)
+        if needed <= 0:
+            break
+        if len(tier) <= needed:
+            selected.extend(tier)
+        else:
+            # Randomly sample within this tier for variety
+            selected.extend(random.sample(tier, needed))
+
+    return selected
+
+
+def fetch_candidate_movies(
+    profile: dict,
+    headers: dict | None = None,
+) -> list[dict]:
     """
     Queries movies-service for candidates matching user profile preferences,
-    filters out watched and disliked movies, prunes to minimal fields,
-    and returns a bounded pool of at most 30 movies.
+    filters out watched movies, prunes to minimal fields,
+    and samples a diverse pool of candidate movies.
     """
     req_headers = {}
     if headers and "Authorization" in headers:
@@ -249,23 +327,40 @@ def fetch_candidate_movies(profile: dict, headers: dict | None = None) -> list[d
     else:
         actor_list = []
 
-    mood = str(profile.get("mood") or "").strip()
-
-    min_year = profile.get("min_year")
-    try:
-        min_year = int(min_year) if min_year is not None else None
-    except (ValueError, TypeError):
-        min_year = None
-
-    params = {}
+    params = {"limit": 100}
     if fav_list:
         params["genres"] = ",".join(fav_list)
     if actor_list:
         params["actors"] = ",".join(actor_list)
-    if mood:
-        params["mood"] = mood
-    if min_year is not None:
-        params["min_year"] = min_year
+
+    # Extract watched titles and favorite movie to pass to movies-service
+    # so watched movies are removed directly at the candidate selection level
+    watched_titles = []
+    for item in (profile.get("watch_history") or []):
+        if isinstance(item, dict):
+            t = item.get("title") or item.get("name")
+        elif isinstance(item, (str, int, float)):
+            t = str(item)
+        else:
+            t = None
+        if t is not None:
+            t_clean = str(t).strip()
+            if t_clean:
+                watched_titles.append(t_clean)
+                t_base = re.sub(r"\s*\(\d{4}\)$", "", t_clean).strip()
+                if t_base:
+                    watched_titles.append(t_base)
+
+    fav_movie_clean = str(profile.get("favorite_movie") or "").strip()
+    if fav_movie_clean:
+        watched_titles.append(fav_movie_clean)
+        fav_base = re.sub(r"\s*\(\d{4}\)$", "", fav_movie_clean).strip()
+        if fav_base:
+            watched_titles.append(fav_base)
+        params["favorite_movie"] = fav_movie_clean
+
+    if watched_titles:
+        params["watched"] = list(dict.fromkeys(watched_titles))
 
     movies = []
     try:
@@ -283,17 +378,19 @@ def fetch_candidate_movies(profile: dict, headers: dict | None = None) -> list[d
     except requests.RequestException as exc:
         logger.warning("Failed to query movies-service with profile filters: %s", exc)
 
-    # Filter out watched movies and disliked genres, and prune to essential fields
+    # Filter out watched movies, prune to essential fields, and sample diverse candidates
     candidates = filter_and_prune_candidates(movies, profile)
-    return candidates[:CANDIDATE_LIMIT]
+    return sample_diverse_candidates(candidates, profile, CANDIDATE_LIMIT)
 
 
 def build_prompt(profile: dict, candidates: list, user_message: str | None) -> str:
     """
     Generates the prompt (to send to AI model), based on:
-    - The user's profile
-    - Movie candidates
+    - The user's preferences (favorite movie, favorite genres, favorite actors)
+    - Movie candidates (with watched titles and favorite movie already filtered out by movies-service)
     - Optionally, a custom user message
+
+    Watch history is purposefully omitted to keep the LLM's context clean and focused.
     """
     pruned_candidates = (candidates or [])[:CANDIDATE_LIMIT]
     candidate_block = (
@@ -301,18 +398,69 @@ def build_prompt(profile: dict, candidates: list, user_message: str | None) -> s
         if pruned_candidates
         else "(no catalog data available - use only well-known, real movies)"
     )
+    fav_movie = str(profile.get("favorite_movie") or "").strip()
+    fav_movie_clause = (
+        f'\nUser\'s all-time favorite movie: "{fav_movie}". Use this to understand their aesthetic and thematic taste (e.g. emotional depth, drama, tone, or character focus). Recommend movies sharing similar themes or artistic appeal (do NOT match based on literal words in the title).'
+        if fav_movie
+        else ""
+    )
+
+    raw_actors = profile.get("favorite_actors") or []
+    if isinstance(raw_actors, str):
+        fav_actors_list = [a.strip() for a in raw_actors.split(",") if a.strip()]
+    elif isinstance(raw_actors, (list, tuple, set)):
+        fav_actors_list = [str(a).strip() for a in raw_actors if str(a).strip()]
+    else:
+        fav_actors_list = []
+    fav_actors_str = ", ".join(fav_actors_list)
+    fav_actors_clause = (
+        f'\nUser\'s favorite actors: "{fav_actors_str}". Heavily prioritize movies starring these actors when present in the candidates.'
+        if fav_actors_str
+        else ""
+    )
+
+    raw_favs = profile.get("favorite_genres") or []
+    if isinstance(raw_favs, str):
+        fav_genres = [g.strip() for g in raw_favs.split(",") if g.strip()]
+    elif isinstance(raw_favs, (list, tuple, set)):
+        fav_genres = [str(g).strip() for g in raw_favs if str(g).strip()]
+    else:
+        fav_genres = []
+
+    # Clean profile context: only high-signal taste preferences, strictly omitting watch history
+    clean_profile = {}
+    if fav_movie:
+        clean_profile["favorite_movie"] = fav_movie
+    if fav_genres:
+        clean_profile["favorite_genres"] = fav_genres
+    if fav_actors_list:
+        clean_profile["favorite_actors"] = fav_actors_list
+
+    fav_genres_str = ", ".join(fav_genres) if fav_genres else ""
+    genre_priority_rule = (
+        f"2. Heavily prioritize movies whose genres match the user's favorite genres ({fav_genres_str}). Movies matching multiple or all of these genres MUST be ranked higher with higher confidence than movies matching only one or none."
+        if fav_genres_str
+        else "2. Heavily prioritize movies whose genres and themes best match the user's taste."
+    )
+    actor_rule = (
+        f'3. If a candidate stars one of the user\'s favorite actors ("{fav_actors_str}") and aligns with the favorite genres, rank it at or near the top with high confidence.'
+        if fav_actors_str
+        else "3. If a candidate aligns closely with the user's favorite movie and genres, rank it at or near the top with high confidence."
+    )
     extra_request = f'\nUser\'s specific request: "{user_message}"' if user_message else ""
 
-    return f"""You are a movie recommendation engine. Given a user's profile and a
-pool of candidate movies, select and rank the best matches based on the user's preferences.
+    return f"""You are a movie recommendation engine. Given a user's preferences and a
+pool of candidate movies, select and rank the best matches based on the user's taste.
 
-User profile:
-{json.dumps(profile, separators=(",", ":"))}
+User preferences:
+{json.dumps(clean_profile, separators=(",", ":"))}
+{fav_movie_clause}
+{fav_actors_clause}
 
 Rules:
 1. You MUST select movies from the candidate list below. Do NOT suggest movies outside this list.
-2. Prioritize movies whose genres, synopsis, or themes best match the user's favorite genres and mood. Movies matching best must be ranked highest with the highest confidence.
-3. Do NOT recommend movies that the user has already watched.
+{genre_priority_rule}
+{actor_rule}
 4. Set a realistic confidence score (between 0.1 and 1.0) reflecting how well each movie matches the profile.
 
 Candidate movies:
@@ -331,7 +479,7 @@ no commentary before or after:
   ]
 }}
 
-Return up to 5 recommendations."""
+Return 5 recommendations."""
 
 
 def call_llm(prompt: str) -> dict:
@@ -351,7 +499,7 @@ def call_llm(prompt: str) -> dict:
                     "schema": RECOMMENDATION_SCHEMA,
                 },
             },
-            "temperature": 0.2,
+            "temperature": float(os.environ.get("LLM_TEMPERATURE", "0.4")),
             "max_tokens": MAX_TOKENS,
             "think": False,
         },
@@ -496,6 +644,8 @@ def enrich_recommendations(llm_recs: list[dict], candidates: list[dict]) -> list
             "genres": cand.get("genres") or [],
             "reason": cand.get("synopsis") or "",
             "confidence": rec["confidence"],
+            "avg_rating": cand.get("rating"),
+            "rating": cand.get("rating"),
         })
 
     return enriched
@@ -563,7 +713,11 @@ def generate():
     # otherwise query movies-service internally
     client_candidates = body.get("candidates")
     if client_candidates and isinstance(client_candidates, list) and len(client_candidates) > 0:
-        candidates = filter_and_prune_candidates(client_candidates, profile)[:CANDIDATE_LIMIT]
+        candidates = sample_diverse_candidates(
+            filter_and_prune_candidates(client_candidates, profile),
+            profile,
+            CANDIDATE_LIMIT,
+        )
     else:
         candidates = fetch_candidate_movies(profile, headers)
 
@@ -612,7 +766,11 @@ def generate_for_user(user_id):
     # otherwise query movies-service internally
     client_candidates = body.get("candidates")
     if client_candidates and isinstance(client_candidates, list) and len(client_candidates) > 0:
-        candidates = filter_and_prune_candidates(client_candidates, profile)[:CANDIDATE_LIMIT]
+        candidates = sample_diverse_candidates(
+            filter_and_prune_candidates(client_candidates, profile),
+            profile,
+            CANDIDATE_LIMIT,
+        )
     else:
         candidates = fetch_candidate_movies(profile)
 
