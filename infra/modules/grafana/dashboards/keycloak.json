@@ -36,22 +36,6 @@
     },
     {
       "id": 2,
-      "type": "stat",
-      "title": "Logins (password validations) in selected range",
-      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "${ds}" },
-      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" },
-      "targets": [
-        {
-          "refId": "A",
-          "instant": true,
-          "expr": "sum(increase(keycloak_credentials_password_hashing_validations_total{job=\"keycloak-scrapper\"}[$__range])) or vector(0)"
-        }
-      ]
-    },
-    {
-      "id": 3,
       "type": "timeseries",
       "title": "HTTP requests per second",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
@@ -69,7 +53,7 @@
       ]
     },
     {
-      "id": 4,
+      "id": 3,
       "type": "timeseries",
       "title": "Average HTTP request latency",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },

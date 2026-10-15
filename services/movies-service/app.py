@@ -125,16 +125,16 @@ def list_movies():
     # 3. Weighted quality sort: rating * ln(vote_count + 2)
     weighted_score = Movie.rating * func.log(func.coalesce(Movie.vote_count, 0) + 2)
 
-    limit = int(request.args.get("limit") or body.get("limit") or 100)
-    limit = max(10, min(limit, 200))
+    limit = int(request.args.get("limit") or body.get("limit") or 30)
+    limit = max(10, min(limit, 50))
 
     movies = []
     all_match_conditions = actor_conditions + genre_conditions
     if all_match_conditions:
-        # Prioritize exact genre matches (5 pts each) and favorite actor presence (4 pts)
+        # Prioritize exact genre matches (5 pts each) and favorite actor presence (40 pts, outweighs any genre combination)
         score_terms = []
         for cond in actor_conditions:
-            score_terms.append(case((cond, 4), else_=0))
+            score_terms.append(case((cond, 10), else_=0))
         for cond in genre_conditions:
             score_terms.append(case((cond, 5), else_=0))
         # Exact multi-genre intersection bonus: if movie matches ALL favorite genres, give massive boost

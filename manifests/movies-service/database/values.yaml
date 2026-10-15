@@ -6,3 +6,9 @@ postgresql:
         username: ${MOVIES_DB_USER}
         password: ${MOVIES_DB_PASSWORD}
         database: ${MOVIES_DB_NAME}
+  primary:
+    persistence:
+      enabled: false
+  readReplicas:
+    persistence:
+      enabled: false

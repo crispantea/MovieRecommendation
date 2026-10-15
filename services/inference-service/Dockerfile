@@ -14,4 +14,4 @@ COPY app.py .
 COPY telemetry.py .
 
 # Use gunicorn in place of Flask's dev server for anything beyond local testing
-CMD ["gunicorn", "--workers", "2", "--timeout", "600", "app:app"]
+CMD ["gunicorn", "--workers", "2", "--timeout", "300", "app:app"]

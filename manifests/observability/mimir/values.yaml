@@ -1,13 +1,29 @@
-mimir:
+mimir-distributed:
+  compactor:
+    persistentVolume:
+      enabled: false
+
+  kafka:
+    persistence:
+      enabled: false
+
   rollout_operator:
     enabled: false
 
   ingester:
+    persistentVolume:
+      enabled: false
     zoneAwareReplication:
       enabled: false
 
   store_gateway:
+    persistentVolume:
+      enabled: false
     zoneAwareReplication:
+      enabled: false
+
+  minio:
+    persistence:
       enabled: false
 
   alertmanager:

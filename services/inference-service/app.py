@@ -51,10 +51,12 @@ MODEL_SERVER_URL = os.environ.get("MODEL_SERVER_URL")
 MODEL_NAME = os.environ.get("MODEL_NAME", "qwen2.5:0.5b")
 MAX_LLM_RETRIES = int(os.environ.get("MAX_LLM_RETRIES", 2))
 MAX_TOKENS = int(os.environ.get("MAX_TOKENS", 500))
-REQUEST_TIMEOUT = int(os.environ.get("REQUEST_TIMEOUT", 600))
+REQUEST_TIMEOUT = int(os.environ.get("REQUEST_TIMEOUT", 300))
 
 # Candidate retrieval settings
 CANDIDATE_LIMIT = int(os.environ.get("CANDIDATE_LIMIT", 15))
+# Larger pool when the user types a specific request, so the LLM has room to satisfy/avoid what they ask
+MESSAGE_CANDIDATE_LIMIT = int(os.environ.get("MESSAGE_CANDIDATE_LIMIT", 40))
 
 # Security / Keycloak Configuration
 KEYCLOAK_JWKS_URL = os.environ.get("KEYCLOAK_JWKS_URL")
@@ -301,6 +303,7 @@ def sample_diverse_candidates(
 def fetch_candidate_movies(
     profile: dict,
     headers: dict | None = None,
+    message: str | None = None,
 ) -> list[dict]:
     """
     Queries movies-service for candidates matching user profile preferences,
@@ -327,6 +330,7 @@ def fetch_candidate_movies(
     else:
         actor_list = []
 
+    limit = MESSAGE_CANDIDATE_LIMIT if message else CANDIDATE_LIMIT
     params = {"limit": 100}
     if fav_list:
         params["genres"] = ",".join(fav_list)
@@ -368,7 +372,7 @@ def fetch_candidate_movies(
             f"{MOVIES_SERVICE_URL}/movies",
             headers=req_headers,
             params=params,
-            timeout=10,
+            timeout=300,
         )
         if resp.ok:
             data = resp.json()
@@ -380,7 +384,7 @@ def fetch_candidate_movies(
 
     # Filter out watched movies, prune to essential fields, and sample diverse candidates
     candidates = filter_and_prune_candidates(movies, profile)
-    return sample_diverse_candidates(candidates, profile, CANDIDATE_LIMIT)
+    return sample_diverse_candidates(candidates, profile, limit)
 
 
 def build_prompt(profile: dict, candidates: list, user_message: str | None) -> str:
@@ -392,7 +396,8 @@ def build_prompt(profile: dict, candidates: list, user_message: str | None) -> s
 
     Watch history is purposefully omitted to keep the LLM's context clean and focused.
     """
-    pruned_candidates = (candidates or [])[:CANDIDATE_LIMIT]
+    message = (user_message or "").strip()
+    pruned_candidates = (candidates or [])[: MESSAGE_CANDIDATE_LIMIT if message else CANDIDATE_LIMIT]
     candidate_block = (
         json.dumps(pruned_candidates, separators=(",", ":"))
         if pruned_candidates
@@ -447,7 +452,28 @@ def build_prompt(profile: dict, candidates: list, user_message: str | None) -> s
         if fav_actors_str
         else "3. If a candidate aligns closely with the user's favorite movie and genres, rank it at or near the top with high confidence."
     )
-    extra_request = f'\nUser\'s specific request: "{user_message}"' if user_message else ""
+    if message:
+        return f"""You are a movie recommendation engine. The user has made a SPECIFIC REQUEST for tonight.
+The request is the most important input: it overrides the user's profile whenever they conflict.
+
+User's request for tonight (HIGHEST PRIORITY): "{message}"
+
+Rules:
+1. You MUST select movies from the candidate list below. Do NOT suggest movies outside this list.
+2. Every recommendation MUST satisfy the request (genre, era, mood, theme, etc.).
+3. Anything the user says they do NOT want (franchises or universes, genres, actors, directors, eras, moods...) is a HARD EXCLUSION.
+   Never recommend a movie that belongs to or is related to an excluded item, even if it matches the profile perfectly.
+   Use your own knowledge of each movie (e.g. its franchise/cinematic universe, cast, director) to detect exclusions, not just the title.
+4. Use the profile below ONLY to choose and rank among movies that already satisfy rules 2 and 3 (favorite genres, actors and favorite movie are tie-breakers, not requirements).
+5. Set a realistic confidence score (between 0.1 and 1.0) reflecting how well each movie matches the request first, then the profile.
+
+User profile (secondary):
+{json.dumps(clean_profile, separators=(",", ":"))}
+
+Candidate movies:
+{candidate_block}
+
+"""+RESPONSE_FORMAT
 
     return f"""You are a movie recommendation engine. Given a user's preferences and a
 pool of candidate movies, select and rank the best matches based on the user's taste.
@@ -465,21 +491,23 @@ Rules:
 
 Candidate movies:
 {candidate_block}
-{extra_request}
 
-Respond with ONLY a JSON object matching this exact shape, no markdown fences,
+"""+RESPONSE_FORMAT
+
+
+RESPONSE_FORMAT = """Respond with ONLY a JSON object matching this exact shape, no markdown fences,
 no commentary before or after:
 
-{{
+{
   "recommendations": [
-    {{
+    {
       "title": "string",
       "confidence": 0.0
-    }}
+    }
   ]
-}}
+}
 
-Return 5 recommendations."""
+Return 5 recommendations (fewer only if the rules above say so)."""
 
 
 def call_llm(prompt: str) -> dict:
@@ -719,7 +747,7 @@ def generate():
             CANDIDATE_LIMIT,
         )
     else:
-        candidates = fetch_candidate_movies(profile, headers)
+        candidates = fetch_candidate_movies(profile, headers, message)
 
     if not DISABLE_INFERENCE_SERVICE_METRICS:
         start = time.perf_counter()
@@ -772,7 +800,7 @@ def generate_for_user(user_id):
             CANDIDATE_LIMIT,
         )
     else:
-        candidates = fetch_candidate_movies(profile)
+        candidates = fetch_candidate_movies(profile, message=message)
 
     if not DISABLE_INFERENCE_SERVICE_METRICS:
         start = time.perf_counter()

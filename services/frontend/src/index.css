@@ -699,6 +699,12 @@ textarea {
   margin-top: 42px;
 }
 
+.prompt-hint {
+  color: var(--lb-text-muted);
+  font-size: 13px;
+  margin: 0 0 16px;
+}
+
 .prompt-bar {
   display: flex;
   gap: 10px;

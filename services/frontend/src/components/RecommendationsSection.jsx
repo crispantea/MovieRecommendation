@@ -181,6 +181,10 @@ export default function RecommendationsSection({
             <LightningIcon /> Generated on demand
           </span>
         </div>
+        <p className="prompt-hint">
+          Your request comes first: we only suggest movies that fit it, and use your profile
+          (favorite genres, actors and movie) to pick the best ones among them.
+        </p>
 
         <form className="prompt-bar" onSubmit={handleGenerate}>
           <input
@@ -188,7 +192,7 @@ export default function RecommendationsSection({
             className="prompt-input"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="Ask the AI for something specific tonight (e.g. an 80s horror movie)..."
+            placeholder="What are you in the mood for tonight? Say what you want and what to avoid (e.g. an 80s horror, no slashers)..."
           />
           <button type="submit" disabled={loading} className="btn-primary">
             {loading ? 'Thinking...' : 'Get Recommendations'}
