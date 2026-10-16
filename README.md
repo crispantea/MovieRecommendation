@@ -74,3 +74,21 @@ Browsers block Web Crypto API (required by Keycloak PKCE) on plain HTTP `IP:PORT
 1. Open `chrome://flags/#unsafely-treat-insecure-origin-as-secure`
 2. Enable **Insecure origins treated as secure** and add `http://<MASTER_EXTERNAL_IP>:30080`
 3. Relaunch Chrome.
+
+---
+
+## Evaluation Load Test
+
+The [`load_test.py`](load_test.py) script creates random Keycloak users, signs each user in, and requests recommendations. Direct Access Grants are enabled on the `agi-web` client.
+
+```bash
+set -a
+source .env
+source .env.secrets
+set +a
+python3 load_test.py --clients 1 2 4
+```
+
+Each simulated user performs one login and one recommendation request per concurrency level. The script creates one account per maximum concurrent client.
+
+The script requires Python 3.10 or newer and `requests` (`python3 -m pip install requests`).

@@ -56,7 +56,7 @@ resource "keycloak_openid_client" "agi_web" {
   access_type                  = "PUBLIC"
   standard_flow_enabled        = true
   implicit_flow_enabled        = false
-  direct_access_grants_enabled = false
+  direct_access_grants_enabled = true  # Allow username/password login for testing purposes (evaluation script)
   service_accounts_enabled     = false
   pkce_code_challenge_method   = "S256"
 

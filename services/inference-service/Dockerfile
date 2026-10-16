@@ -12,6 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app.py .
 COPY telemetry.py .
+COPY gunicorn.conf.py .
 
 # Use gunicorn in place of Flask's dev server for anything beyond local testing
-CMD ["gunicorn", "--workers", "2", "--timeout", "300", "app:app"]
+CMD ["gunicorn", "-c", "gunicorn.conf.py", "app:app"]

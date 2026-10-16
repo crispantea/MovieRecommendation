@@ -158,3 +158,7 @@ Concurrent clients & Avg. latency (ms) & p95 latency (ms) & Throughput (req/s) &
 The expected bottleneck is the AI inference layer because recommendation generation requires model execution and may be slower than the profile and cache operations. Nevertheless, cache hits and filtered candidate selection can reduce latency in repeated requests. This evaluation helps quantify the trade-off between recommendation quality and system responsiveness. Overall, the project demonstrates a realistic AI-powered recommendation platform that satisfies the base microservice requirements while incorporating advanced persistence and deployment features in a reproducible cloud-native environment.
 
 \end{document}
+
+
+% References:
+% - https://registry.terraform.io/providers/hashicorp/google/latest/docs
