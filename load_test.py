@@ -1,6 +1,7 @@
 """Create random Keycloak users and measure recommendation latency and throughput."""
 
 import argparse
+import math
 import os
 import secrets
 import time
@@ -12,6 +13,11 @@ import requests
 def succeeded(sample):
     status = sample[2]
     return isinstance(status, int) and 200 <= status < 300
+
+
+def percentile(values, percent):
+    ordered = sorted(values)
+    return ordered[max(0, math.ceil(percent * len(ordered) / 100) - 1)]
 
 
 def timed_request(session, step, method, url, **kwargs):
@@ -37,7 +43,6 @@ def get_admin_token(args):
             "username": args.admin_user,
             "password": args.admin_password,
         },
-        timeout=args.timeout,
     )
     response.raise_for_status()
     return response.json()["access_token"]
@@ -63,7 +68,6 @@ def create_users(args, count):
             f"{args.keycloak_url}/admin/realms/{args.realm}/users",
             headers=headers,
             json=user,
-            timeout=args.timeout,
         )
         if response.status_code != 201:
             raise RuntimeError(
@@ -85,7 +89,6 @@ def login(args, session, username, password):
             "username": username,
             "password": password,
         },
-        timeout=args.timeout,
     )
 
 
@@ -98,47 +101,53 @@ def virtual_user(args, credentials):
             return None
 
         session.headers["Authorization"] = f"Bearer {token}"
+        request_started = time.perf_counter()
         recommendation_sample, _ = timed_request(
             session,
             "recommendations",
             "POST",
             f"{args.inference_url}/recommendations/generate",
             json={"message": args.prompt},
-            timeout=args.timeout,
         )
-        return recommendation_sample
+        request_finished = time.perf_counter()
+        return recommendation_sample, request_started, request_finished
 
 
 def run_level(args, clients, users):
-    started = time.perf_counter()
     with ThreadPoolExecutor(max_workers=clients) as pool:
         results = list(pool.map(lambda user: virtual_user(args, user), users[:clients]))
-    elapsed = time.perf_counter() - started
-    successful = [sample for sample in results if sample and succeeded(sample)]
-    throughput = len(successful) / elapsed
-    avg_latency = (
-        sum(sample[1] for sample in successful) / len(successful)
+    successful = [result for result in results if result and succeeded(result[0])]
+    latencies_ms = [result[0][1] * 1000 for result in successful]
+    throughput_window = (
+        max(result[2] for result in successful)
+        - min(result[1] for result in successful)
         if successful
-        else None
+        else 0
     )
+    throughput = (len(successful) / throughput_window if throughput_window else 0) * 60
+    avg_latency = sum(latencies_ms) / len(latencies_ms) if latencies_ms else None
+    p95_latency = percentile(latencies_ms, 95) if latencies_ms else None
 
-    latency_text = f"{avg_latency:.2f} s" if avg_latency is not None else "n/a"
-    print(f"{clients} clients | throughput: {throughput:.2f} recommendations/s | average latency: {latency_text}")
+    avg_text = f"{avg_latency:.2f}" if avg_latency is not None else "n/a"
+    p95_text = f"{p95_latency:.2f}" if p95_latency is not None else "n/a"
+    print(
+        f"{clients:>18} | {avg_text:>17} | {p95_text:>16} | "
+        f"{throughput:>18.3f}"
+    )
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--clients", nargs="+", type=int, default=[1, 2, 4])
     parser.add_argument("--prompt", default="Recommend a science fiction movie for tonight.")
-    parser.add_argument("--timeout", type=float, default=600)
     parser.add_argument("--keycloak-url", default=os.getenv("KEYCLOAK_URL", "http://localhost:8080"))
     parser.add_argument("--realm", default=os.getenv("KEYCLOAK_APP_REALM", "agi-project"))
     parser.add_argument("--client-id", default=os.getenv("KEYCLOAK_APP_CLIENT_ID", "agi-web"))
     parser.add_argument("--inference-url", default=os.getenv("INFERENCE_API_URL", "http://localhost:8000"))
     args = parser.parse_args()
 
-    if any(value < 1 for value in args.clients) or args.timeout <= 0:
-        parser.error("clients and timeout must be positive")
+    if any(value < 1 for value in args.clients):
+        parser.error("clients must be positive")
     args.admin_user = os.getenv("KEYCLOAK_ADMIN_USER", "admin")
     args.admin_password = os.getenv("KEYCLOAK_ADMIN_PASSWORD")
     if not args.admin_password:
@@ -148,6 +157,10 @@ def main():
         setattr(args, name, getattr(args, name).rstrip("/"))
 
     users = create_users(args, max(args.clients))
+    print(
+        f"{'Concurrent clients':>18} | {'Avg. latency (ms)':>17} | "
+        f"{'p95 latency (ms)':>16} | {'Throughput (req/min)':>18}"
+    )
     for clients in args.clients:
         run_level(args, clients, users)
 

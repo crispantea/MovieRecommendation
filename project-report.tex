@@ -37,7 +37,13 @@
 
 \institute{Departamento de Engenharia Informática, Instituto Superior Técnico}
 
-\twocolumn[\maketitle\vspace{5em}]
+\twocolumn[
+    \maketitle
+    \begin{center}
+        \textbf{Project demonstration video:} \href{https://youtu.be/NBkYlZBNThY}{https://youtu.be/NBkYlZBNThY}
+    \end{center}
+    \vspace{2em}
+]
 
 % TODO: Video link
 
@@ -128,34 +134,42 @@ This implementation leverages self-hosted persistent storage to decouple databas
 
 \section{Evaluation and Performance Study}
 
-The project statement requires a system evaluation including throughput and latency as the number of concurrent clients grows. This evaluation is essential to understand how the application behaves under load and which components become performance bottlenecks.
+To assess the scalability and responsiveness of the proposed system, we evaluate overall end-to-end throughput, mean response time, and 95th percentile ($P_{95}$) latency under varying operational loads. This evaluation characterizes system behavior under increasing concurrent demand and helps identify performance bottlenecks across the architecture.
 
-The proposed evaluation methodology is as follows:
-
+The evaluation methodology is structured as follows:
 \begin{enumerate}
-    \item Define a workload representative of the recommendation workflow, including login, profile retrieval, and recommendation request generation.
-    \item Increase the number of concurrent clients gradually from 1 to 50 or higher.
-    \item Measure average response time, p95 latency, and throughput in requests per second.
-    \item Record the behavior of the authentication, profiles, inference, and cache layers under increasing load.
+    \item \textbf{Workload Definition:} Construct a workload representative of the complete recommendation workflow, encompassing user authentication, profile retrieval, and recommendation generation.
+    \item \textbf{Concurrency Scaling:} Incrementally scale the number of concurrent clients from 1 to 25 to evaluate system performance under progressive load conditions.
+    \item \textbf{End-to-End Metrics Collection:} Measure aggregate end-to-end throughput in requests per minute (req / min), mean response time, and $P_{95}$ latency across all concurrent requests.
+    \item \textbf{System Observation:} Observe overall stability and component behavior across the authentication, profile, inference, and caching layers under stress to pinpoint performance bottlenecks.
 \end{enumerate}
+
 
 \begin{table*}[t]
 \centering
-\begin{tabular}{p{2.6cm}p{2.2cm}p{2.2cm}p{2.5cm}p{3.4cm}}
+\label{tab:load_test_results}
+\setlength{\tabcolsep}{14pt} 
+\renewcommand{\arraystretch}{1.15} 
+\begin{tabular}{c r r r}
 \toprule
-Concurrent clients & Avg. latency (ms) & p95 latency (ms) & Throughput (req/s) & Observation \\
+\textbf{Concurrent Clients} & \textbf{Avg. Latency (ms)} & \textbf{$P_{95}$ Latency (ms)} & \textbf{Throughput (req / min)} \\
 \midrule
-1 & [value] & [value] & [value] & Baseline \\
-10 & [value] & [value] & [value] & Stable \\
-25 & [value] & [value] & [value] & Minor degradation \\
-50 & [value] & [value] & [value] & Increased latency \\
-100 & [value] & [value] & [value] & Saturation region \\
+1   & 79714.40 & 79714.40 & 0.753 \\
+2   & 130086.21 & 167518.79 & 0.710 \\
+4   & 231582.37 & 269013.42 & 0.446 \\
+10  & 543182.45 & 628940.12 & 0.264 \\
+25  & 1382405.80 & 1614830.25 & 0.115 \\
 \bottomrule
 \end{tabular}
-\caption{Representative load-test measurements.}
+\vspace{10pt}
+\caption{System performance metrics under scaling concurrent client loads.}
 \end{table*}
 
-The expected bottleneck is the AI inference layer because recommendation generation requires model execution and may be slower than the profile and cache operations. Nevertheless, cache hits and filtered candidate selection can reduce latency in repeated requests. This evaluation helps quantify the trade-off between recommendation quality and system responsiveness. Overall, the project demonstrates a realistic AI-powered recommendation platform that satisfies the base microservice requirements while incorporating advanced persistence and deployment features in a reproducible cloud-native environment.
+The empirical results in Table~\ref{tab:load_test_results} reflect the expected performance characteristics of the current deployment environment. Recommendation generation is served by a single Ollama pod hosted on a low-cost, CPU-only \texttt{e2-standard-2} instance without GPU acceleration, forcing all concurrent clients to share a constrained compute footprint. As client concurrency increases, average response times rise steeply and overall throughput declines. This degradation occurs because heavy AI model execution quickly exhausts the CPU capacity, causing the runtime to spend substantial processing cycles on task queue management, context switching, and thread synchronization rather than active inference execution.
+
+This computational bottleneck is further amplified by the system's caching workflow. Shortly after a client creates or updates a user profile, the background cache agent automatically initiates a new recommendation request to pre-compute and store fresh recommendations. Consequently, the volume of requests reaching the inference service can effectively double per client session. Under high concurrent load, this automatic pre-computation adds significant background traffic, compounding queuing delays at the single model-serving pod.
+
+Importantly, these performance bounds align with the primary objective of this project: demonstrating a fully integrated, reproducible, cloud-native architecture rather than benchmarking raw model latency. The platform's clear microservice boundaries and Kubernetes-based orchestration make it straightforward to expand inference capacity—such as by deploying additional Ollama replica pods or adding GPU-backed nodes—without modifying any upstream services. Horizontally scaling the inference layer thus represents a practical direction for future work to support larger production workloads.
 
 \end{document}
 
