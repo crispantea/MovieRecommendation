@@ -154,7 +154,7 @@ The \texttt{just} recipes coordinate these stages as well as cleanup and environ
 
 \section{Advanced Components and Deployment Methods}
 
-Among the advanced components and deployment methods proposed by the project, we selected \textbf{persistent storage} as the feature to implement. It was chosen to protect application state from pod restarts and replacements, which is especially important for databases and cached recommendations.
+Among the advanced components and deployment methods proposed by the project, we selected \textbf{persistent storage} as the feature to implement. It was chosen to protect application state from pod restarts and replacements.
 
 For the GCP Kubernetes deployment, Terraform provisions persistent disks for Keycloak PostgreSQL, the profiles database, and Redis, then exports their volume handles. The GCP Persistent Disk CSI driver lets Kubernetes attach and mount these existing disks. Helm chart templates conditionally create the corresponding PersistentVolumes and PersistentVolumeClaims when persistence is enabled (cloud deployments only); each stateful workload mounts its claim. The shared StorageClass configures the CSI provisioner, delays binding until a pod uses the volume, permits expansion, and retains the disk when a claim is released.
 
