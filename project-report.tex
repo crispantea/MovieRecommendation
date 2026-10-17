@@ -28,8 +28,8 @@
         \centering
         Martim Aires de Sousa (ist1106468)\inst{1}\\
         {\small \texttt{martim.aires.de.sousa@tecnico.ulisboa.pt}}\\[0.8em]
-        Cristiano Pantea (ist1XXXXXX)\inst{1}\\
-        {\small \texttt{[email]}}\\[0.8em]
+        Cristiano Pantea (ist1106324)\inst{1}\\
+        {\small \texttt{[cristianopantea@tecnico.ulisboa.pt]}}\\[0.8em]
         João Pinheiro (ist1XXXXXX)\inst{1}\\
         {\small \texttt{[email]}}
     }
@@ -44,8 +44,6 @@
     \end{center}
     \vspace{2em}
 ]
-
-% TODO: Video link
 
 
 \section*{Abstract}
@@ -62,7 +60,7 @@ The project is implemented as a realistic cloud-native application and is organi
 
 \section{System Design and Architecture}
 
-The application is structured as several independent services connected through HTTP interfaces and environment-based configuration.
+The application is structured as several independent services connected through HTTP interfaces and environment-based configuration. The system can be run in two kinds of environments. In the first, everything runs as plain Docker containers on a single machine (Docker Compose), without Kubernetes; this is meant for local development and testing. In the second, the services are deployed on a Kubernetes cluster, either a local Kind cluster or a self-managed cluster on GCP. Some components, namely the API gateway and the observability stack, exist only in the Kubernetes environments. The environments are described in Section~\ref{sec:deployment}.
 
 \begin{figure*}[t]
     \centering
@@ -75,14 +73,14 @@ The application is structured as several independent services connected through 
 The system is composed by the following microservices:
 
 \begin{itemize}
-    \item \textbf{Ingress and reverse proxy:} KGateway routes HTTP traffic to services in Kubernetes through Gateway API resources. In Docker Compose, Nginx within the frontend container serves the React application and proxies the profiles, inference, and cache API paths to their respective services.
+    \item \textbf{API gateway (Kubernetes only):} KGateway is the single entry point of the Kubernetes deployments and routes incoming HTTP requests to the right service. In the Docker Compose environment there is no gateway; instead, the Nginx server inside the frontend container serves the web application and forwards the API requests to the corresponding services.
     \item \textbf{Frontend:} a web interface developed with React and Vite, used for authentication and interaction with the recommendation system.
     \item \textbf{Authentication:} Keycloak provides identity management and token validation for secure access across microservices.
     \item \textbf{Profiles service:} exposes a Flask REST API for managing user profiles, preferences, and watch history, with data stored in PostgreSQL.
     \item \textbf{Movies service:} exposes a Flask REST API for the movie catalog and metadata (stored in a PostgreSQL database) used by the inference service to rank cataloged movies.
     \item \textbf{Inference service:} exposes a Flask REST API that coordinates recommendation generation, using profile and movie data and invoking the local Ollama model.
     \item \textbf{Cache agent:} exposes a Flask REST API and background refresh logic to store recommendations in Redis for fast retrieval.
-    \item \textbf{Monitoring stack:} Grafana, Mimir, and OpenTelemetry provide metrics and dashboards for observability.
+    \item \textbf{Monitoring stack (Kubernetes only):} Grafana, Mimir, and OpenTelemetry provide metrics and dashboards for observability. This stack is only deployed in the Kubernetes environments; the local Docker Compose environment does not include observability.
 \end{itemize}
 
 \subsection{Communication and interaction}
@@ -101,9 +99,15 @@ For observability, \textbf{OpenTelemetry} collects Keycloak metrics and inferenc
 
 \subsection{Deployment and Configuration}
 
-\subsubsection{Deployment Environments.}
+\subsubsection{Deployment Environments.}\label{sec:deployment}
 
-The repository supports different environments for deployment: local Docker Compose, a local Kind cluster, and a self-managed Kubernetes cluster on GCP. Compose runs the application and its dependencies locally. Kind creates a local cluster and loads the application images into it, while the cloud environment provisions compute nodes for the control plane and workers. Environment files provide deployment-specific settings.
+The repository supports three deployment environments, all built from the same services and configuration:
+\begin{itemize}
+    \item \textbf{Local (Docker Compose):} every service and database runs as a plain container on one machine, with no Kubernetes. It is the fastest way to run the complete application and is meant for development and testing. It includes neither the gateway nor the observability stack, and data is not persisted between runs.
+    \item \textbf{Kind (local Kubernetes):} a Kubernetes cluster running inside Docker on the developer's machine, into which the application images are loaded. It exercises the same Kubernetes manifests, gateway and observability stack as the cloud, without any cloud cost.
+    \item \textbf{Cloud (GCP):} a self-managed Kubernetes cluster on virtual machines, with control-plane and worker nodes, persistent disks and the full stack. This is the production-like environment.
+\end{itemize}
+Switching between them requires no change to the services or manifests. Each environment is described by an environment file with its specific values, such as host names, ports and whether persistence is enabled, on top of a shared file with the values common to all of them. The deployment tooling loads the file selected for the run and the services only read these values as configuration, without knowing where they are running. This keeps the differences between environments confined to configuration and makes adding or changing an environment simple.
 
 \subsubsection{Application and Platform Packaging.}
 
