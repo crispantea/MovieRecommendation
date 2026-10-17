@@ -1,0 +1,43 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Observability" id="obs1">
+    <mxGraphModel dx="1274" dy="879" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="o_apps" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;fontStyle=1;fillColor=#dae8fc;strokeColor=#6c8ebf;dashed=1;arcSize=3;opacity=40;fontSize=16;" value="Apps" vertex="1">
+          <mxGeometry height="250" width="210" as="geometry" />
+        </mxCell>
+        <mxCell id="o_obs" parent="1" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;fontStyle=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;arcSize=4;opacity=40;fontSize=16;" value="Observability" vertex="1">
+          <mxGeometry height="250" width="790" x="379" as="geometry" />
+        </mxCell>
+        <mxCell id="o_kc" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;" value="keycloak" vertex="1">
+          <mxGeometry height="54" width="170" x="20" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="o_is" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;" value="inference-service" vertex="1">
+          <mxGeometry height="54" width="170" x="20" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="o_ot" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;" value="otel-collector" vertex="1">
+          <mxGeometry height="210" width="170" x="399" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="o_mm" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;" value="mimir" vertex="1">
+          <mxGeometry height="54" width="170" x="689" y="98" as="geometry" />
+        </mxCell>
+        <mxCell id="o_gf" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=15;" value="grafana" vertex="1">
+          <mxGeometry height="54" width="170" x="979" y="98" as="geometry" />
+        </mxCell>
+        <mxCell id="o_e1" edge="1" parent="1" source="o_ot" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;endArrow=block;endFill=1;fontSize=13;labelBackgroundColor=#ffffff;exitX=0;exitY=0.2238;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="o_kc" value="scrapes metrics">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="o_e2" edge="1" parent="1" source="o_is" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;endArrow=block;endFill=1;fontSize=13;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.8429;entryDx=0;entryDy=0;" target="o_ot" value="pushes metrics (OTLP)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="o_e3" edge="1" parent="1" source="o_ot" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;endArrow=block;endFill=1;fontSize=13;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="o_mm" value="remote write">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="o_e4" edge="1" parent="1" source="o_gf" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;endArrow=block;endFill=1;fontSize=13;labelBackgroundColor=#ffffff;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="o_mm" value="queries">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
