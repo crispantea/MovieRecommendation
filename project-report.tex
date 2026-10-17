@@ -78,7 +78,7 @@ The system is composed by the following microservices:
     \item \textbf{Authentication:} Keycloak provides identity management and token validation for secure access across microservices.
     \item \textbf{Profiles service:} exposes a Flask REST API for managing user profiles, preferences, and watch history, with data stored in PostgreSQL.
     \item \textbf{Movies service:} exposes a Flask REST API for the movie catalog and metadata (stored in a PostgreSQL database) used by the inference service to rank cataloged movies.
-    \item \textbf{Inference service:} exposes a Flask REST API that coordinates recommendation generation, using profile and movie data and invoking the local Ollama model.
+    \item \textbf{Inference service:} exposes a Flask REST API that coordinates recommendation generation, using profile and movie data and invoking the local Ollama model (Section~\ref{sec:model}).
     \item \textbf{Cache agent:} exposes a Flask REST API and background refresh logic to store recommendations in Redis for fast retrieval.
     \item \textbf{Monitoring stack (Kubernetes only):} Grafana, Mimir, and OpenTelemetry provide metrics and dashboards for observability. This stack is only deployed in the Kubernetes environments; the local Docker Compose environment does not include observability.
 \end{itemize}
@@ -98,6 +98,29 @@ For recommendation generation, the frontend calls the \textbf{Inference Service}
 After a profile update, Profiles sends a best-effort event to the \textbf{Cache Agent}, which schedules an asynchronous refresh. The agent calls Inference for that user's recommendations and stores the result in Redis. The frontend reads through the cache API; a cache miss returns an empty fallback, while a failed refresh preserves any existing entry.
 
 For observability, \textbf{OpenTelemetry} collects Keycloak metrics and inference telemetry, \textbf{Mimir} stores the metrics, and \textbf{Grafana} presents them in dashboards.
+
+\subsection{AI Model and Recommendation Generation}
+\label{sec:model}
+
+\subsubsection{Model Choice.}
+
+Our cluster runs on low-cost virtual machines without a GPU, and the application does not need a highly tuned model. We therefore looked for the smallest model that still gave reasonable recommendations and ended up with \texttt{qwen2.5:0.5b}, a 0.5 billion parameter model from the Qwen family. It is taken from the public Ollama library and used as is, with no training or fine-tuning. Ollama runs as its own service in the cluster, and the Inference service talks to it over HTTP.
+
+\subsubsection{Candidate Selection.}
+
+A model this small is not reliable at recalling movies, and the full catalog is too large to send to it. So the model does not search for movies: it only ranks a short list prepared beforehand from the user's profile. The Movies service makes a quick first filter over the catalog:
+\begin{itemize}
+    \item movies the user has already watched are discarded, and only movies matching at least one favorite genre or favorite actor are considered;
+    \item each of them gets points for every favorite genre it has, more points for featuring a favorite actor, and a bonus if it matches all the favorite genres;
+    \item the movies are sorted by these points, using a quality score based on the rating and the number of votes to break ties, and only the best 50 are returned. This quality score also fills the list when the profile gives few matches.
+\end{itemize}
+Of the tens of thousands of movies in the catalog, only these few dozen reach the next step. The Inference service then combines the movies received from the Movies service with the user's profile, obtained from the Profiles service, to build the call to the LLM.
+
+\subsubsection{Prompt and Response.}
+
+The prompt includes the user's favorite genres, actors and movie, the candidate list, and a few rules: only recommend movies from the list, favor the ones matching the user's genres and actors, and give each recommendation a confidence score. The favorite movie is used to understand the user's taste, not to match words in titles. If the user writes a specific request, such as a horror movie from the 80s, more candidates are sent and the request takes priority over the profile, including anything the user asks to avoid.
+
+Ollama is asked to answer in a fixed format with five recommendations. We validate the answer and repeat the request if it is invalid, and we discard any movie that is not in the candidate list. The details of each movie (year, genres, synopsis and rating) come from the catalog and not from the model, so the model cannot invent them. The same process is used for the recommendations requested by the user and for those pre-computed by the cache agent.
 
 \subsection{Deployment and Configuration}
 
