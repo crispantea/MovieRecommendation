@@ -97,7 +97,14 @@ For recommendation generation, the frontend calls the \textbf{Inference Service}
 
 After a profile update, Profiles sends a best-effort event to the \textbf{Cache Agent}, which schedules an asynchronous refresh. The agent calls Inference for that user's recommendations and stores the result in Redis. The frontend reads through the cache API; a cache miss returns an empty fallback, while a failed refresh preserves any existing entry.
 
-For observability, \textbf{OpenTelemetry} collects Keycloak metrics and inference telemetry, \textbf{Mimir} stores the metrics, and \textbf{Grafana} presents them in dashboards.
+For observability, the \textbf{OpenTelemetry} collector is the central point where metrics are gathered (Figure~\ref{fig:observability}). It periodically scrapes the metrics exposed by Keycloak and receives the metrics that the Inference service pushes to it, namely the duration of each call to the LLM. The collector then writes everything to \textbf{Mimir}, which stores the metrics, and \textbf{Grafana} reads from Mimir to present them in dashboards. As mentioned before, this stack is only deployed in the Kubernetes environments.
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=0.85\linewidth]{static/observability.drawio.png}
+    \caption{Observability stack. The OpenTelemetry collector scrapes Keycloak and receives the metrics pushed by the Inference service, writes them to Mimir, and Grafana queries Mimir to build the dashboards.}
+    \label{fig:observability}
+\end{figure*}
 
 \subsection{AI Model and Recommendation Generation}
 \label{sec:model}
