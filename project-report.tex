@@ -87,7 +87,7 @@ The system is composed by the following microservices:
 
 External traffic enters the system through a single entry point, which depends on the environment. In the Kubernetes environments (Kind and GCP), \textbf{KGateway} receives all requests and routes them to the right service according to the request path, so that users only need to know one address. In the Docker Compose environment, which has no gateway, the \textbf{Nginx} server of the frontend container takes this role for the API paths, forwarding them to the corresponding services.
 
-In the Kubernetes environments, the gateway is configured through the standard Kubernetes Gateway API. A single Gateway defines the HTTP listener of the cluster and is exposed outside of it through a fixed port on the cluster nodes, port 30080 (a Kubernetes NodePort). Each service then declares its own route, attached to this Gateway, which associates a path prefix with the service that should receive the matching requests. Adding a service to the system therefore only requires a new route, without changing the gateway itself. The exposed port is mapped to a port of the host machine in the Kind cluster, while on GCP the application is reached through the external address of the cluster.
+In the Kubernetes environments, the gateway is configured through the standard Kubernetes Gateway API. A single Gateway defines the HTTP listener of the cluster and is exposed outside of it through a fixed port on the cluster nodes, port 30080 (a Kubernetes NodePort). Each service then declares its own route, attached to this Gateway, which associates a path prefix with the service that should receive the matching requests. Adding a service to the system therefore only requires a new route, without changing the gateway itself. The exposed port is mapped to a port of the host machine that is running the gateway. On GCP the application is reached through the external address of the cluster.
 
 The \textbf{frontend} communicates with backend microservices through authenticated REST endpoints rather than relying on a monolithic backend. \textbf{Keycloak} issues signed tokens to users when they log in, and each service that requires authentication fetches Keycloak's public key and verifies the token of every incoming request by itself. Each service has a clearly defined responsibility, with service-to-service communication handled through authenticated HTTP requests and environment-based routing.
 
@@ -125,7 +125,7 @@ Of the tens of thousands of movies in the catalog, only these few dozen reach th
 
 \subsubsection{Prompt and Response.}
 
-The prompt includes the user's favorite genres, actors and movie, the candidate list, and a few rules: only recommend movies from the list, favor the ones matching the user's genres and actors, and give each recommendation a confidence score. The favorite movie is used to understand the user's taste, not to match words in titles. If the user writes a specific request, such as a horror movie from the 80s, more candidates are sent and the request takes priority over the profile, including anything the user asks to avoid.
+The prompt includes the user's favorite genres, actors and movie, the candidate list, and a few rules: only recommend movies from the list; favor the ones matching the user's genres and actors; and give each recommendation a confidence score. The favorite movie is used to understand the user's taste, not to match words in titles. If the user writes a specific request, such as a horror movie from the 80s, more candidates are sent and the request takes priority over the profile, including anything the user asks to avoid.
 
 Ollama is asked to answer in a fixed format with five recommendations. We validate the answer and repeat the request if it is invalid, and we discard any movie that is not in the candidate list. The details of each movie (year, genres, synopsis and rating) come from the catalog and not from the model, so the model cannot invent them. The same process is used for the recommendations requested by the user and for those pre-computed by the cache agent.
 
@@ -139,7 +139,7 @@ The repository supports three deployment environments, all built from the same s
     \item \textbf{Kind (local Kubernetes):} a Kubernetes cluster running inside Docker on the developer's machine, into which the application images are loaded. It exercises the same Kubernetes manifests, gateway and observability stack as the cloud, without any cloud cost.
     \item \textbf{Cloud (GCP):} a self-managed Kubernetes cluster on virtual machines, with control-plane and worker nodes, persistent disks and the full stack. This is the production-like environment.
 \end{itemize}
-Switching between them requires no change to the services or manifests. Each environment is described by an environment file with its specific values, such as host names, ports and whether persistence is enabled, on top of a shared file with the values common to all of them. The deployment tooling loads the file selected for the run and the services only read these values as configuration, without knowing where they are running. This keeps the differences between environments confined to configuration and makes adding or changing an environment simple.
+Switching between them requires no change to the services or manifests. Each environment is described by an environment file with its specific values, such as host names, ports and whether persistence is enabled, on top of a shared file with the values common to all of them. The deployment tooling loads the files selected for the run and the services only read these values as configuration, without knowing where they are running. This keeps the differences between environments confined to configuration and makes adding or changing an environment simple.
 
 \subsubsection{Application and Platform Packaging.}
 
@@ -153,7 +153,7 @@ The cloud deployment is orchestrated by the \texttt{just cloud-up} recipe and pr
     \item \textbf{Infrastructure provisioning.} Terraform creates the GCP compute instances, network and firewall configuration, and persistent disks (for authentication, profiles, and cache data). It also generates the Ansible inventory and exports disk handles for Kubernetes.
     \item \textbf{Node and cluster configuration.} Ansible configures the Ubuntu nodes and containerd, installs Kubernetes, initializes the control plane with kubeadm and Calico, joins worker nodes, transfers application images, and updates the cloud environment with the control-plane address.
     \item \textbf{Persistent-storage setup.} Cloud initialization installs the GCP Persistent Disk CSI driver and applies a StorageClass. The driver lets Kubernetes attach and mount the Terraform-provisioned disks as pod volumes, preserving database and cache data across pod replacement; the StorageClass defines their retention and expansion behavior.
-    \item \textbf{Application deployment.} The Kubernetes deployment first installs the Gateway API definitions and the gateway, and then deploys the services one by one. Third-party components (Keycloak, the PostgreSQL databases, Ollama, Redis, Mimir, Grafana and the OpenTelemetry collector) are installed from Helm charts, while our own services (frontend, Profiles, Movies, Inference and Cache agent) are described by Kubernetes manifests customized for each environment. Each service and its dependencies live in a dedicated namespace; for example, the Profiles service and its PostgreSQL database run together in the profiles-service namespace. Terraform then configures Keycloak (the realm, user roles and the web client) and Grafana (the dashboards) as soon as each one is running.
+    \item \textbf{Application deployment.} The Kubernetes deployment first installs the Gateway API definitions and the gateway, and then deploys the services one by one. Third-party components (Keycloak, the PostgreSQL databases, Ollama, Redis, Mimir, Grafana and the OpenTelemetry collector) are installed from Helm charts, while our own services (Frontend, Profiles, Movies, Inference and Cache agent) are described by Kubernetes manifests customized for each environment. Each service and its dependencies live in a dedicated namespace; for example, the Profiles service and its PostgreSQL database run together in the profiles-service namespace. Terraform then configures Keycloak (the realm, user roles and the web client) and Grafana (the dashboards) as soon as each one is running.
 \end{enumerate}
 
 The \texttt{just} recipes coordinate these stages as well as cleanup and environment selection.
@@ -183,7 +183,6 @@ The evaluation methodology is structured as follows:
 
 \begin{table*}[t]
 \centering
-\label{tab:load_test_results}
 \setlength{\tabcolsep}{14pt} 
 \renewcommand{\arraystretch}{1.15} 
 \begin{tabular}{c r r r}
@@ -199,6 +198,7 @@ The evaluation methodology is structured as follows:
 \end{tabular}
 \vspace{10pt}
 \caption{System performance metrics under scaling concurrent client loads.}
+\label{tab:load_test_results}
 \end{table*}
 
 The empirical results in Table~\ref{tab:load_test_results} reflect the expected performance characteristics of the current deployment environment. Recommendation generation is served by a single Ollama pod hosted on a low-cost, CPU-only \texttt{e2-standard-2} instance without GPU acceleration, forcing all concurrent clients to share a constrained compute footprint. As client concurrency increases, average response times rise steeply and overall throughput declines. This degradation occurs because heavy AI model execution quickly exhausts the CPU capacity, causing the runtime to spend substantial processing cycles on task queue management, context switching, and thread synchronization rather than active inference execution.
@@ -208,7 +208,3 @@ This computational bottleneck is further amplified by the system's caching workf
 Importantly, these performance bounds align with the primary objective of this project: demonstrating a fully integrated, reproducible, cloud-native architecture rather than benchmarking raw model latency. The platform's clear microservice boundaries and Kubernetes-based orchestration make it straightforward to expand inference capacity—such as by deploying additional Ollama replica pods or adding GPU-backed nodes—without modifying any upstream services. Horizontally scaling the inference layer thus represents a practical direction for future work to support larger production workloads.
 
 \end{document}
-
-
-% References:
-% - https://registry.terraform.io/providers/hashicorp/google/latest/docs
